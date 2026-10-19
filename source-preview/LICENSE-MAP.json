@@ -1,0 +1,21 @@
+{
+  "original_mit": [
+    "framework/lua/zhvjia/*.lua",
+    "examples/association_demo/**",
+    "tools/prepare_sources.py",
+    "*.md",
+    "framework/README.md",
+    "framework/ORIGINS.json",
+    "SOURCE-LOCK.json",
+    "RESOURCE-SOURCES.json",
+    "VERIFICATION.json",
+    "MANIFEST.json",
+    "LICENSE-MAP.json"
+  ],
+  "upstream": {
+    "patches/weasel.patch": "LICENSES/weasel.txt",
+    "patches/librime.patch": "LICENSES/librime.txt",
+    "patches/librime-lua.patch": "LICENSES/librime-lua.txt"
+  },
+  "license_texts": "Original authors retain copyright in their respective license notices; MIT does not replace those terms."
+}

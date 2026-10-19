@@ -1,0 +1,2617 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8c625c2e056a6b8bec95432b9a5450707d2bec24..ad469a878c4df7488c21f8a357317fa844e6b248 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -233,7 +233,7 @@ if(INSTALL_PRIVATE_HEADERS)
+     ${PROJECT_BINARY_DIR}/src/rime/*.h)
+   install(FILES ${rime_private_header_files}
+     DESTINATION ${CMAKE_INSTALL_FULL_INCLUDEDIR}/rime)
+-  foreach(rime_private_header_files_dir algo config dict gear lever)
++  foreach(rime_private_header_files_dir algo config dict gear lever interaction)
+     file(GLOB rime_private_header_files
+       ${PROJECT_SOURCE_DIR}/src/rime/${rime_private_header_files_dir}/*.h)
+     install(FILES ${rime_private_header_files}
+diff --git a/docs/interaction-view.md b/docs/interaction-view.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..003ada867dad096b2d57b6c5ff58c441f515fd30
+--- /dev/null
++++ b/docs/interaction-view.md
+@@ -0,0 +1,60 @@
++# 整段结果与预编辑投影（开发接口，2026-10-19）
++
++这两个接口补充现有 Rime Context。普通拼音、分段选词、词典学习仍使用原有流程；本接口不提供新的输入法引擎或通用草稿收集器。
++
++## 整段合成结果
++
++计算器、代码等模式先设置本次模式属性 `_interaction_mode`，再用
++`ctx:make_atomic_candidate(candidate)` 包装合成的 `SimpleCandidate`。返回的候选明确拥有当前整串输入，覆盖范围为 `0..#ctx.input`；失败返回空值。普通 Phrase、多项去重集合、含原子包装的对象和已有内部选定前段的输入不能通过此入口。
++
++资格绑定 Context 生命周期、全局唯一输入版本、完整原始输入与模式。输入修改后恢复相同字节、模式切换后再切回、另一个会话均不能重新使用旧资格。外层显示包装和杆的断环持有层保留此资格；过深或含混的包装保守拒绝。
++
++普通 Select、ConfirmCurrentSelection、杆 SelectAlternate 和公开 CommitComposition 共用核验。有效结果归一为完整 composition，再走 Rime 的原生选择／提交通知；过期结果不能通过编辑器的 Confirm-or-Commit 回退路径提交。键盘、鼠标和 C API 不分别拼接结果，也不使用 commit_text 后清空。
++
++`_auto_commit=false` 仍遵守原生语义：选择完成后保留内部已确认状态。接口不强制立即向应用上屏。调用者负责生成完整结果，不会自动补回旧前段或拼接剩余尾码。合成结果不伪装成 Phrase 学习证据；Lua 监听器仍应在迁移时按模式处理自己的学习。
++
++## 显示投影
++
++Lua 可设置当前状态的显示正文及原始编码到显示位置的映射：
++
++```lua
++local p = {
++  input_revision = ctx.input_revision,
++  view_revision = ctx.view_revision,
++  text = "12",                    -- ctx.input 为 "/=12"
++  raw_to_display = {0, 0, 0, 1, 2},
++  sel_start = 0,
++  sel_end = 2,
++}
++assert(ctx:set_preedit_projection(p))
++```
++
++底层位置一律为 UTF-8 字节偏移，Lua 数组第1项对应 raw=0。映射长度是原始输入字节数加1，首项0、末项等于显示正文长度；值不递减且落在合法显示字符边界。重复值允许隐藏引导符。输入和正文至多64KiB；错误编码、NUL、换行、制表符、负数／小数、越界及旧版本均被拒绝。非法请求不覆盖仍有效的旧投影。
++
++`ctx:get_preedit()` 返回投影后的正文、实际显示光标与单段选中范围。软光标和原生 composition.prompt 在共同出口插入；`ctx:get_preedit_body()` 只返回可提交正文，排除这些提示。未设置有效投影时保持 Rime 原来的预编辑生成规则。
++
++投影不修改原始输入或真实插入光标。输入、光标、模式、schema 或 composition 变化会失效；原生 selector 直接写入的选择状态也在读取版本／投影时核对。版本在进程内唯一，跨会话复用会被拒绝。异步生产者必须保留请求时版本，不能在回包时用新版本重新盖章。
++
++投影通过已有 `RimeContext.composition` 返回，所以普通前端也能取得文本和光标；没有扩展普通 C API 的四个预编辑字段。扩展前端还可读取独立的区段元数据；它不替代按键路由、拼音断点、辅码筛选或 Unicode 层的 Lua 状态机。
++
++## 区段样式与实际空间（2026-10-19后续批次）
++
++投影可选 `regions` 列表，最多64段，每段包含 UTF-8 字节位置 `start`、`end`、显示用 `style_key` 和默认true的 `highlightable`。区段须非空、有序、不重叠，键为至多64字节的ASCII字母、数字、`_`、`.`、`-`；错误请求仍整体拒绝。Lua的保留字须写为 `["end"]`。
++
++共享出口在插入提示后重新映射区段，自动将软光标和原生提示标记为 `cursor`、`tips` 且不可高亮。可选 `get_preedit/free_preedit` 返回精确显示文本和最多192个区段，扩展前端可分别量宽和绘制；普通前端继续使用原来的单段选中范围。区段样式不会混进候选正文或改变Enter的正文出口。
++
++`highlightable=false` 与 `style_key` 都只是显示语义，不会从提交正文删除该区段。投影text只放可提交正文；独立Tips仍使用composition.prompt，避免把控制区的“不可高亮”误当成“不可提交”。
++
++来源项与杆项有可选 `style_key` 元数据。原item数组仍保持v2布局，通过追加的 `get_item_style` 读取；其字符串归快照所有。前端需先检查 `data_size` 和函数指针，旧核心不提供时使用普通样式。
++
++空间布局来自前端真正命中鼠标的最终矩形，使用 `set_layout` 发布；每会话最多256项，严格绑定当前快照代次、frame token和递增的布局修订号。布局更新不修改输入、不发Context通知。`clear_layout` 在失焦或前端失效时清空并使旧token不能重新发布。
++
++`snap:neighbor(id, direction)` 返回 `target_id,status`，其中方向为left/right/up/down。Ok且target=0表示墙；没有当前实测布局或快照过期返回Expired。同代次更换或释放旧快照不销毁有效布局。左右只看同一主行带中真正相邻的列，当前高度无对应项就停止，不越过短杆；杆内向上到顶返回挂载主项，上下不循环。所有目标仍通过原highlight/select路径激活。
++
++本体不新增默认按键：上下仍选普通候选，左右仍编辑预编码。杆的进入、移动和退出仅供用户显式绑定；接口示例不是默认键位。
++
++## 构建边界
++
++Interaction C API 仍为版本2，item 数组布局未改变。Context 的 C++ 布局和 Composition 的内部接口有变化，必须整体重编译匹配的引擎和所有使用这些 C++ 类型的插件，禁止混入旧的 C++ 插件二进制。
++
++区域样式和空间查询已接入配套Weasel开发线（客户端协议3、UIStyle序列化2），仍只形成开发产物。完整Lua模式迁移完成后再统一安装／切换，不为单个开发批次安排系统重启。
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 16082869502d247528f54b3061e3962c0f9d87d3..fefc07145d6730c5f88eb271656fd3c2d0a694f0 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -5,6 +5,7 @@ aux_source_directory(rime/config rime_config_src)
+ aux_source_directory(rime/dict rime_dict_src)
+ aux_source_directory(rime/gear rime_gears_src)
+ aux_source_directory(rime/lever rime_levers_src)
++aux_source_directory(rime/interaction rime_interaction_src)
+ if(rime_plugins_library)
+   aux_source_directory(../plugins rime_plugins_src)
+ endif()
+@@ -12,7 +13,8 @@ endif()
+ set(rime_core_module_src
+   ${rime_api_src}
+   ${rime_base_src}
+-  ${rime_config_src})
++  ${rime_config_src}
++  ${rime_interaction_src})
+ 
+ # add rc info for windows MSVC build
+ if(WIN32)
+diff --git a/src/rime/candidate.cc b/src/rime/candidate.cc
+index cbefbd06e43a01724c9e700868aa8966441aad7f..0589207c5a654a4bf9eda95e85eb5ff97bfdfed7 100644
+--- a/src/rime/candidate.cc
++++ b/src/rime/candidate.cc
+@@ -8,26 +8,44 @@
+ 
+ namespace rime {
+ 
+-static an<Candidate> UnpackShadowCandidate(const an<Candidate>& cand) {
+-  auto shadow = As<ShadowCandidate>(cand);
+-  return shadow ? shadow->item() : cand;
+-}
+-
+ an<Candidate> Candidate::GetGenuineCandidate(const an<Candidate>& cand) {
+-  auto uniquified = As<UniquifiedCandidate>(cand);
+-  return UnpackShadowCandidate(uniquified ? uniquified->items().front() : cand);
++  an<Candidate> current = cand;
++  // Display and interaction wrappers can be nested. Learning must reach the
++  // original Phrase rather than stop at the next display wrapper.
++  for (int depth = 0; current && depth < 64; ++depth) {
++    if (auto shadow = As<ShadowCandidate>(current)) {
++      current = shadow->item();
++    } else if (auto uniquified = As<UniquifiedCandidate>(current)) {
++      if (uniquified->items().empty())
++        return nullptr;
++      current = uniquified->items().front();
++    } else {
++      return current;
++    }
++  }
++  return nullptr;
+ }
+ 
+-vector<of<Candidate>> Candidate::GetGenuineCandidates(
+-    const an<Candidate>& cand) {
+-  vector<of<Candidate>> result;
+-  if (auto uniquified = As<UniquifiedCandidate>(cand)) {
++static void CollectGenuineCandidates(const an<Candidate>& cand,
++                                     vector<of<Candidate>>* result,
++                                     int depth) {
++  if (!cand || depth >= 64)
++    return;
++  if (auto shadow = As<ShadowCandidate>(cand)) {
++    CollectGenuineCandidates(shadow->item(), result, depth + 1);
++  } else if (auto uniquified = As<UniquifiedCandidate>(cand)) {
+     for (const auto& item : uniquified->items()) {
+-      result.push_back(UnpackShadowCandidate(item));
++      CollectGenuineCandidates(item, result, depth + 1);
+     }
+   } else {
+-    result.push_back(UnpackShadowCandidate(cand));
++    result->push_back(cand);
+   }
++}
++
++vector<of<Candidate>> Candidate::GetGenuineCandidates(
++    const an<Candidate>& cand) {
++  vector<of<Candidate>> result;
++  CollectGenuineCandidates(cand, &result, 0);
+   return result;
+ }
+ 
+diff --git a/src/rime/composition.cc b/src/rime/composition.cc
+index ac057e8589f5d9a688b3a1a1e91d11af91874981..99445491360bd6bb502fb49377668f8968d20e4e 100644
+--- a/src/rime/composition.cc
++++ b/src/rime/composition.cc
+@@ -23,7 +23,8 @@ bool Composition::HasFinishedComposition() const {
+ 
+ Preedit Composition::GetPreedit(const string& full_input,
+                                 size_t caret_pos,
+-                                const string& caret) const {
++                                const string& caret,
++                                bool include_prompt) const {
+   Preedit preedit;
+   preedit.caret_pos = string::npos;
+   size_t start = 0;
+@@ -57,7 +58,8 @@ Preedit Composition::GetPreedit(const string& full_input,
+           if (caret_pos == end && end == full_input.length()) {
+             preedit.sel_end = preedit.sel_start + caret_placeholder;
+             preedit.caret_pos = preedit.sel_end;
+-            preedit.text += cand->preedit().substr(caret_placeholder + 1);
++            if (include_prompt)
++              preedit.text += cand->preedit().substr(caret_placeholder + 1);
+           }
+         } else {
+           preedit.text += cand->preedit();
+@@ -82,7 +84,7 @@ Preedit Composition::GetPreedit(const string& full_input,
+     preedit.text += full_input.substr(end);
+   }
+   // insert soft cursor and prompt string.
+-  auto prompt = caret + GetPrompt();
++  auto prompt = include_prompt ? caret + GetPrompt() : string();
+   if (!prompt.empty()) {
+     preedit.text.insert(preedit.caret_pos, prompt);
+     if (preedit.caret_pos < preedit.sel_start) {
+diff --git a/src/rime/composition.h b/src/rime/composition.h
+index 428f19ee75e6e7ce5c8ad5be0abc86f5e8e19e03..dc0e35228a96e9ffb7610bef610874be9df88eeb 100644
+--- a/src/rime/composition.h
++++ b/src/rime/composition.h
+@@ -25,7 +25,8 @@ class Composition : public Segmentation {
+   bool HasFinishedComposition() const;
+   Preedit GetPreedit(const string& full_input,
+                      size_t caret_pos,
+-                     const string& caret) const;
++                     const string& caret,
++                     bool include_prompt = true) const;
+   string GetPrompt() const;
+   string GetCommitText() const;
+   string GetScriptText(bool keep_selection = true) const;
+diff --git a/src/rime/context.cc b/src/rime/context.cc
+index 43f0b418eefe68377416f03111e5311b3eac0a3a..d7a7339d4d5976d9618dc664170f11aa4384735e 100644
+--- a/src/rime/context.cc
++++ b/src/rime/context.cc
+@@ -5,9 +5,12 @@
+ // 2011-05-08 GONG Chen <chen.sst@gmail.com>
+ //
+ #include <algorithm>
++#include <atomic>
++#include <sstream>
+ #include <utility>
+ #include <rime/candidate.h>
+ #include <rime/context.h>
++#include <rime/interaction/candidate.h>
+ #include <rime/menu.h>
+ #include <rime/segmentation.h>
+ 
+@@ -15,9 +18,233 @@ namespace rime {
+ 
+ const string kSelectedBeforeEditing = "selected_before_editing";
+ 
++namespace {
++std::atomic<uint64_t> next_context_id{1};
++std::atomic<uint64_t> next_state_revision{1};
++constexpr size_t kMaxProjectionBytes = 64 * 1024;
++
++bool IsSynthesizedPayload(an<Candidate> candidate) {
++  for (int depth = 0; candidate && depth < 32; ++depth) {
++    if (auto shadow = As<ShadowCandidate>(candidate)) {
++      candidate = shadow->item();
++    } else if (auto unique = As<UniquifiedCandidate>(candidate)) {
++      if (unique->items().size() != 1)
++        return false;
++      candidate = unique->items().front();
++    } else {
++      return bool(As<SimpleCandidate>(candidate));
++    }
++  }
++  return false;
++}
++
++// Strict UTF-8, including rejection of overlong encodings and surrogates.
++bool Utf8Boundaries(const string& text, vector<bool>* boundaries) {
++  boundaries->assign(text.size() + 1, false);
++  size_t i = 0;
++  while (i < text.size()) {
++    (*boundaries)[i] = true;
++    const auto lead = static_cast<unsigned char>(text[i]);
++    size_t length = 0;
++    uint32_t codepoint = 0, minimum = 0;
++    if (lead < 0x80) { length = 1; codepoint = lead; }
++    else if (lead >= 0xc2 && lead <= 0xdf) {
++      length = 2; codepoint = lead & 0x1f; minimum = 0x80;
++    } else if (lead >= 0xe0 && lead <= 0xef) {
++      length = 3; codepoint = lead & 0x0f; minimum = 0x800;
++    } else if (lead >= 0xf0 && lead <= 0xf4) {
++      length = 4; codepoint = lead & 7; minimum = 0x10000;
++    } else { return false; }
++    if (i + length > text.size()) return false;
++    for (size_t j = 1; j < length; ++j) {
++      auto byte = static_cast<unsigned char>(text[i + j]);
++      if ((byte & 0xc0) != 0x80) return false;
++      codepoint = (codepoint << 6) | (byte & 0x3f);
++    }
++    if (codepoint < minimum || codepoint > 0x10ffff ||
++        (codepoint >= 0xd800 && codepoint <= 0xdfff) || codepoint == 0)
++      return false;
++    i += length;
++  }
++  (*boundaries)[text.size()] = true;
++  return true;
++}
++}  // namespace
++
++Context::Context()
++    : instance_id_(next_context_id.fetch_add(1)),
++      input_revision_(next_state_revision.fetch_add(1)),
++      view_revision_(next_state_revision.fetch_add(1)) {}
++
++void Context::InvalidateView(bool input_changed) {
++  if (input_changed)
++    input_revision_ = next_state_revision.fetch_add(1);
++  view_revision_ = next_state_revision.fetch_add(1);
++  ClearPreeditProjection();
++}
++
++void Context::ClearPreeditProjection() {
++  has_projection_ = false;
++  projection_ = PreeditProjection{};
++}
++
++bool Context::HasCurrentProjection() const {
++  return has_projection_ && projection_.input_revision == input_revision_ &&
++         projection_.view_revision == view_revision();
++}
++
++string Context::ProjectionSelectionKey() const {
++  // Native selector/editor paths can update Segment fields directly, without
++  // Context::Highlight. Observe those changes without forcing lazy menus.
++  std::ostringstream key;
++  for (const auto& segment : composition_) {
++    key << segment.start << ':' << segment.end << ':' << segment.status << ':'
++        << segment.selected_index << ':' << segment.menu.get() << ':'
++        << segment.alternate_candidate.get() << ':' << segment.alternate_item_id
++        << ';';
++  }
++  return key.str();
++}
++
++uint64_t Context::view_revision() const {
++  auto key = ProjectionSelectionKey();
++  if (key != observed_selection_key_) {
++    observed_selection_key_ = std::move(key);
++    view_revision_ = next_state_revision.fetch_add(1);
++    has_projection_ = false;
++  }
++  return view_revision_;
++}
++
++bool Context::SetPreeditProjection(PreeditProjection projection) {
++  if (input_.empty() || input_.size() > kMaxProjectionBytes ||
++      projection.text.size() > kMaxProjectionBytes ||
++      projection.input_revision != input_revision_ ||
++      projection.view_revision != view_revision() ||
++      projection.raw_to_display.size() != input_.size() + 1 ||
++      projection.raw_to_display.front() != 0 ||
++      projection.raw_to_display.back() != projection.text.size() ||
++      projection.sel_start > projection.sel_end ||
++      projection.sel_end > projection.text.size() ||
++      projection.text.find_first_of("\r\n\t") != string::npos)
++    return false;
++  vector<bool> raw_boundaries, display_boundaries;
++  if (!Utf8Boundaries(input_, &raw_boundaries) ||
++      !Utf8Boundaries(projection.text, &display_boundaries) ||
++      !raw_boundaries[caret_pos_] ||
++      !display_boundaries[projection.sel_start] ||
++      !display_boundaries[projection.sel_end])
++    return false;
++  size_t previous = 0;
++  for (size_t value : projection.raw_to_display) {
++    if (value < previous || value > projection.text.size() ||
++        !display_boundaries[value])
++      return false;
++    previous = value;
++  }
++  if (projection.regions.size() > 64)
++    return false;
++  size_t previous_end = 0;
++  for (const auto& region : projection.regions) {
++    if (region.start < previous_end || region.start >= region.end ||
++        region.end > projection.text.size() ||
++        !display_boundaries[region.start] || !display_boundaries[region.end] ||
++        region.style_key.size() > 64)
++      return false;
++    for (unsigned char ch : region.style_key)
++      if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
++            (ch >= '0' && ch <= '9') || ch == '_' || ch == '.' || ch == '-'))
++        return false;
++    previous_end = region.end;
++  }
++  projection_ = std::move(projection);
++  has_projection_ = true;
++  return true;
++}
++
++an<Candidate> Context::MakeAtomicCandidate(an<Candidate> candidate) const {
++  if (!candidate || input_.empty() || input_.size() > kMaxProjectionBytes ||
++      get_property("_interaction_mode").empty() ||
++      interaction::HasAtomicCandidate(candidate) ||
++      !IsSynthesizedPayload(candidate))
++    return nullptr;
++  // Never silently discard a previously converted prefix. Atomic-mode Lua
++  // must own the complete input before generating this synthesized result.
++  for (size_t i = 0; i + 1 < composition_.size(); ++i)
++    if (composition_[i].status >= Segment::kSelected)
++      return nullptr;
++  return New<interaction::AtomicCandidate>(
++      std::move(candidate), instance_id_, input_revision_, input_,
++      get_property("_interaction_mode"));
++}
++
++bool Context::IsAtomicCandidateCurrent(const an<Candidate>& candidate) const {
++  auto atomic = interaction::AsAtomicCandidate(candidate);
++  return atomic && atomic->instance_id() == instance_id_ &&
++         atomic->input_revision() == input_revision_ &&
++         atomic->input() == input_ && !input_.empty() &&
++         !atomic->mode().empty() &&
++         atomic->mode() == get_property("_interaction_mode") &&
++         candidate->start() == 0 && candidate->end() == input_.size();
++}
++
++bool Context::PrepareAtomicSelection(an<Candidate> candidate, uint32_t item_id) {
++  if (!IsAtomicCandidateCurrent(candidate))
++    return false;
++  // OnSelect can call Commit after this same normalization. Keep that path
++  // idempotent, including _auto_commit=false's trailing empty segment.
++  if (composition_.size() <= 2 && !composition_.empty() &&
++      composition_.front().HasTag("atomic_result") &&
++      composition_.front().HasAlternate() &&
++      composition_.front().start == 0 &&
++      composition_.front().end == input_.size() &&
++      composition_.front().GetSelectedCandidate() == candidate &&
++      (composition_.size() == 1 ||
++       (composition_.back().start == input_.size() &&
++        composition_.back().end == input_.size() &&
++        !composition_.back().GetSelectedCandidate())))
++    return true;
++  for (size_t i = 0; i + 1 < composition_.size(); ++i)
++    if (composition_[i].status >= Segment::kSelected)
++      return false;
++  Composition replacement;
++  replacement.Reset(input_);
++  Segment segment(0, static_cast<int>(input_.size()));
++  segment.status = Segment::kSelected;
++  segment.tags.insert("atomic_result");
++  segment.alternate_candidate = std::move(candidate);
++  segment.alternate_item_id = item_id;
++  replacement.push_back(std::move(segment));
++  composition_ = std::move(replacement);
++  caret_pos_ = input_.size();
++  InvalidateView();
++  return true;
++}
++
++bool Context::SelectAtomic(an<Candidate> candidate, uint32_t item_id,
++                           size_t /*menu_index*/) {
++  if (!PrepareAtomicSelection(std::move(candidate), item_id))
++    return false;
++  select_notifier_(this);
++  return true;
++}
++
+ bool Context::Commit() {
+   if (!IsComposing())
+     return false;
++  an<Candidate> atomic;
++  for (const auto& segment : composition_) {
++    auto candidate = segment.GetSelectedCandidate();
++    if (interaction::HasAtomicCandidate(candidate)) {
++      if (atomic)
++        return false;
++      atomic = std::move(candidate);
++    }
++  }
++  // Also protects Editor's Confirm || Commit fallback and the public
++  // CommitComposition API. A rejected stale selection must not fall through.
++  if (atomic && !PrepareAtomicSelection(std::move(atomic), 0))
++    return false;
+   // notify the engine and interesting components
+   commit_notifier_(this);
+   // start over
+@@ -42,7 +269,88 @@ string Context::GetSoftCursor() const {
+ }
+ 
+ Preedit Context::GetPreedit() const {
+-  return composition_.GetPreedit(input_, caret_pos_, GetSoftCursor());
++  if (!HasCurrentProjection())
++    return composition_.GetPreedit(input_, caret_pos_, GetSoftCursor());
++  Preedit preedit;
++  preedit.text = projection_.text;
++  preedit.caret_pos = projection_.raw_to_display[caret_pos_];
++  preedit.sel_start = projection_.sel_start;
++  preedit.sel_end = projection_.sel_end;
++  const auto prompt = GetSoftCursor() + composition_.GetPrompt();
++  if (!prompt.empty()) {
++    preedit.text.insert(preedit.caret_pos, prompt);
++    if (preedit.caret_pos < preedit.sel_start)
++      preedit.sel_start += prompt.size();
++    if (preedit.caret_pos < preedit.sel_end)
++      preedit.sel_end += prompt.size();
++  }
++  return preedit;
++}
++
++string Context::GetPreeditBody() const {
++  return HasCurrentProjection() ? projection_.text :
++      composition_.GetPreedit(input_, caret_pos_, string(), false).text;
++}
++
++vector<PreeditDisplayRegion> Context::GetPreeditRegions() const {
++  const bool projected = HasCurrentProjection();
++  const auto body = GetPreeditBody();
++  const auto preedit = GetPreedit();
++  vector<PreeditDisplayRegion> result;
++  if (preedit.text.empty())
++    return result;
++  auto append = [&](size_t start, size_t end, const string& key,
++                    bool highlightable) {
++    if (start < end)
++      result.push_back({start, end, key, highlightable});
++  };
++  const auto at = preedit.caret_pos;
++  // Native composition and projected views both insert their prompt at the
++  // display caret. If an older/custom preedit breaks that shape, preserve it
++  // as an ordinary region instead of guessing which text is a prompt.
++  if (preedit.text.size() < body.size() || at > body.size()) {
++    append(0, preedit.text.size(), string(), true);
++    return result;
++  }
++  const size_t inserted = preedit.text.size() - body.size();
++  if (preedit.text.compare(0, at, body, 0, at) != 0 ||
++      preedit.text.substr(at + inserted) != body.substr(at)) {
++    append(0, preedit.text.size(), string(), true);
++    return result;
++  }
++  vector<PreeditDisplayRegion> body_regions;
++  size_t end = 0;
++  if (projected) {
++    for (const auto& region : projection_.regions) {
++      if (end < region.start)
++        body_regions.push_back({end, region.start, string(), true});
++      body_regions.push_back(region);
++      end = region.end;
++    }
++  }
++  if (end < body.size())
++    body_regions.push_back({end, body.size(), string(), true});
++  for (const auto& region : body_regions) {
++    append(region.start, (std::min)(region.end, at), region.style_key,
++            region.highlightable);
++    if (region.end > at)
++      append((std::max)(region.start, at) + inserted, region.end + inserted,
++              region.style_key, region.highlightable);
++  }
++  if (inserted) {
++    const auto soft_cursor = GetSoftCursor();
++    const size_t cursor_length =
++        inserted >= soft_cursor.size() &&
++        preedit.text.compare(at, soft_cursor.size(), soft_cursor) == 0 ?
++            soft_cursor.size() : 0;
++    append(at, at + cursor_length, "cursor", false);
++    append(at + cursor_length, at + inserted, "tips", false);
++  }
++  std::stable_sort(result.begin(), result.end(),
++      [](const PreeditDisplayRegion& a, const PreeditDisplayRegion& b) {
++        return a.start < b.start;
++      });
++  return result;
+ }
+ 
+ bool Context::IsComposing() const {
+@@ -63,6 +371,7 @@ an<Candidate> Context::GetSelectedCandidate() const {
+ }
+ 
+ bool Context::PushInput(char ch) {
++  InvalidateView(true);
+   if (caret_pos_ >= input_.length()) {
+     input_.push_back(ch);
+     caret_pos_ = input_.length();
+@@ -75,6 +384,7 @@ bool Context::PushInput(char ch) {
+ }
+ 
+ bool Context::PushInput(const string& str) {
++  InvalidateView(true);
+   if (caret_pos_ >= input_.length()) {
+     input_ += str;
+     caret_pos_ = input_.length();
+@@ -89,6 +399,7 @@ bool Context::PushInput(const string& str) {
+ bool Context::PopInput(size_t len) {
+   if (caret_pos_ < len)
+     return false;
++  InvalidateView(true);
+   caret_pos_ -= len;
+   input_.erase(caret_pos_, len);
+   update_notifier_(this);
+@@ -98,12 +409,14 @@ bool Context::PopInput(size_t len) {
+ bool Context::DeleteInput(size_t len) {
+   if (caret_pos_ + len > input_.length())
+     return false;
++  InvalidateView(true);
+   input_.erase(caret_pos_, len);
+   update_notifier_(this);
+   return true;
+ }
+ 
+ void Context::Clear() {
++  InvalidateView(true);
+   input_.clear();
+   caret_pos_ = 0;
+   composition_.clear();
+@@ -115,6 +428,10 @@ bool Context::Select(size_t index) {
+     return false;
+   Segment& seg(composition_.back());
+   if (auto cand = seg.GetCandidateAt(index)) {
++    if (interaction::HasAtomicCandidate(cand))
++      return SelectAtomic(cand, 0, index);
++    InvalidateView();
++    seg.ClearAlternate();
+     seg.selected_index = index;
+     seg.status = Segment::kSelected;
+     DLOG(INFO) << "Selected: '" << cand->text() << "', index = " << index;
+@@ -132,10 +449,13 @@ bool Context::Highlight(size_t index) {
+   size_t new_index =
+       candidate_count > 0 ? (std::min)(candidate_count - 1, index) : 0;
+   size_t previous_index = seg.selected_index;
+-  if (previous_index == new_index) {
++  bool had_alternate = seg.HasAlternate();
++  seg.ClearAlternate();
++  if (previous_index == new_index && !had_alternate) {
+     DLOG(INFO) << "selection has not changed, currently at " << new_index;
+     return false;
+   }
++  InvalidateView();
+   seg.selected_index = new_index;
+   update_notifier_(this);
+   DLOG(INFO) << "selection changed from: " << previous_index
+@@ -143,10 +463,51 @@ bool Context::Highlight(size_t index) {
+   return true;
+ }
+ 
++bool Context::HighlightAlternate(an<Candidate> candidate, uint32_t item_id) {
++  if (composition_.empty() || !candidate || item_id == 0)
++    return false;
++  if (interaction::HasAtomicCandidate(candidate) &&
++      !IsAtomicCandidateCurrent(candidate))
++    return false;
++  Segment& seg(composition_.back());
++  if (seg.alternate_candidate == candidate && seg.alternate_item_id == item_id)
++    return true;
++  InvalidateView();
++  seg.alternate_candidate = std::move(candidate);
++  seg.alternate_item_id = item_id;
++  update_notifier_(this);
++  return true;
++}
++
++bool Context::SelectAlternate(an<Candidate> candidate, uint32_t item_id) {
++  if (composition_.empty() || !candidate || item_id == 0)
++    return false;
++  if (interaction::HasAtomicCandidate(candidate))
++    return SelectAtomic(candidate, item_id, 0);
++  InvalidateView();
++  Segment& seg(composition_.back());
++  seg.alternate_candidate = std::move(candidate);
++  seg.alternate_item_id = item_id;
++  seg.status = Segment::kSelected;
++  DLOG(INFO) << "Selected alternate: '" << seg.GetSelectedCandidate()->text()
++             << "', item_id = " << item_id;
++  select_notifier_(this);
++  return true;
++}
++
++void Context::ClearAlternateSelection() {
++  if (composition_.empty())
++    return;
++  InvalidateView();
++  composition_.back().ClearAlternate();
++}
++
+ bool Context::DeleteCandidate(size_t index) {
+   if (composition_.empty())
+     return false;
++  InvalidateView();
+   Segment& seg(composition_.back());
++  seg.ClearAlternate();
+   seg.selected_index = index;
+   DLOG(INFO) << "Deleting candidate: " << seg.GetSelectedCandidate()->text();
+   delete_notifier_(this);
+@@ -157,6 +518,8 @@ bool Context::DeleteCurrentSelection() {
+   if (composition_.empty())
+     return false;
+   Segment& seg(composition_.back());
++  if (seg.HasAlternate())
++    return false;
+   return DeleteCandidate(seg.selected_index);
+ }
+ 
+@@ -164,6 +527,10 @@ bool Context::ConfirmCurrentSelection() {
+   if (composition_.empty())
+     return false;
+   Segment& seg(composition_.back());
++  if (auto candidate = seg.GetSelectedCandidate())
++    if (interaction::HasAtomicCandidate(candidate))
++      return SelectAtomic(candidate, seg.alternate_item_id, seg.selected_index);
++  InvalidateView();
+   seg.status = Segment::kSelected;
+   if (auto cand = seg.GetSelectedCandidate()) {
+     DLOG(INFO) << "Confirmed: '" << cand->text()
+@@ -198,6 +565,7 @@ bool Context::ConfirmPreviousSelection() {
+ 
+ bool Context::ReopenPreviousSegment() {
+   if (composition_.Trim()) {
++    InvalidateView();
+     if (!composition_.empty() &&
+         composition_.back().status >= Segment::kSelected) {
+       composition_.back().Reopen(caret_pos());
+@@ -230,6 +598,7 @@ bool Context::ReopenPreviousSelection() {
+       while (it != composition_.rbegin()) {
+         composition_.pop_back();
+       }
++      InvalidateView();
+       it->Reopen(caret_pos());
+       update_notifier_(this);
+       return true;
+@@ -246,6 +615,7 @@ bool Context::ClearNonConfirmedComposition() {
+     reverted = true;
+   }
+   if (reverted) {
++    InvalidateView();
+     composition_.Forward();
+     DLOG(INFO) << "composition: " << composition_.GetDebugText();
+   }
+@@ -261,6 +631,7 @@ bool Context::RefreshNonConfirmedComposition() {
+ }
+ 
+ void Context::set_caret_pos(size_t caret_pos) {
++  InvalidateView();
+   if (caret_pos > input_.length())
+     caret_pos_ = input_.length();
+   else
+@@ -269,16 +640,20 @@ void Context::set_caret_pos(size_t caret_pos) {
+ }
+ 
+ void Context::set_composition(Composition&& comp) {
++  InvalidateView();
+   composition_ = std::move(comp);
+ }
+ 
+ void Context::set_input(const string& value) {
++  InvalidateView(true);
+   input_ = value;
+   caret_pos_ = input_.length();
+   update_notifier_(this);
+ }
+ 
+ void Context::set_option(const string& name, bool value) {
++  if (get_option(name) != value)
++    InvalidateView();
+   options_[name] = value;
+   DLOG(INFO) << "Context::set_option " << name << " = " << value;
+   option_update_notifier_(this, name);
+@@ -293,6 +668,8 @@ bool Context::get_option(const string& name) const {
+ }
+ 
+ void Context::set_property(const string& name, const string& value) {
++  if (name == "_interaction_mode" && get_property(name) != value)
++    InvalidateView(true);
+   properties_[name] = value;
+   property_update_notifier_(this, name);
+ }
+@@ -306,6 +683,7 @@ string Context::get_property(const string& name) const {
+ }
+ 
+ void Context::ClearTransientOptions() {
++  InvalidateView(true);
+   DLOG(INFO) << "Context::ClearTransientOptions";
+   auto opt = options_.lower_bound("_");
+   while (opt != options_.end() && !opt->first.empty() && opt->first[0] == '_') {
+diff --git a/src/rime/context.h b/src/rime/context.h
+index 6f514320c90fa1977939f5340984bfd9de0b889a..829d5badc656384ff1f7eca49232b01446b3232c 100644
+--- a/src/rime/context.h
++++ b/src/rime/context.h
+@@ -10,12 +10,33 @@
+ #include <rime/common.h>
+ #include <rime/commit_history.h>
+ #include <rime/composition.h>
++#include <cstdint>
+ 
+ namespace rime {
+ 
+ class Candidate;
+ class KeyEvent;
+ 
++// Display-only projection of the current input. Positions are UTF-8 bytes;
++// raw_to_display has input.size()+1 monotone entries, including both ends.
++// Revisions bind the view to one input/caret/mode state, never to a later edit.
++struct PreeditDisplayRegion {
++  size_t start = 0;
++  size_t end = 0;
++  string style_key;
++  bool highlightable = true;
++};
++
++struct PreeditProjection {
++  uint64_t input_revision = 0;
++  uint64_t view_revision = 0;
++  string text;
++  vector<size_t> raw_to_display;
++  size_t sel_start = 0;
++  size_t sel_end = 0;
++  vector<PreeditDisplayRegion> regions;
++};
++
+ class RIME_DLL Context {
+  public:
+   using Notifier = signal<void(Context* ctx)>;
+@@ -25,13 +46,23 @@ class RIME_DLL Context {
+   using KeyEventNotifier =
+       signal<void(Context* ctx, const KeyEvent& key_event)>;
+ 
+-  Context() = default;
++  Context();
+   ~Context() = default;
+ 
+   bool Commit();
+   string GetCommitText() const;
+   string GetScriptText() const;
+   Preedit GetPreedit() const;
++  string GetPreeditBody() const;
++  vector<PreeditDisplayRegion> GetPreeditRegions() const;
++  bool SetPreeditProjection(PreeditProjection projection);
++  void ClearPreeditProjection();
++  uint64_t input_revision() const { return input_revision_; }
++  uint64_t view_revision() const;
++  // Whole-input, synthesized results only. Ordinary dictionary selections
++  // retain their existing segmented selection and learning path.
++  an<Candidate> MakeAtomicCandidate(an<Candidate> candidate) const;
++  bool IsAtomicCandidateCurrent(const an<Candidate>& candidate) const;
+   bool IsComposing() const;
+   bool HasMenu() const;
+   an<Candidate> GetSelectedCandidate() const;
+@@ -46,6 +77,10 @@ class RIME_DLL Context {
+   bool Select(size_t index);
+   // return false if the selected index has not changed
+   bool Highlight(size_t index);
++  // Highlight/select a real payload that is not a main-menu index.
++  bool HighlightAlternate(an<Candidate> candidate, uint32_t item_id);
++  bool SelectAlternate(an<Candidate> candidate, uint32_t item_id);
++  void ClearAlternateSelection();
+   bool DeleteCandidate(size_t index);
+   // return false if there's no candidate for current segment
+   bool ConfirmCurrentSelection();
+@@ -94,7 +129,19 @@ class RIME_DLL Context {
+ 
+  private:
+   string GetSoftCursor() const;
+-
++  void InvalidateView(bool input_changed = false);
++  bool HasCurrentProjection() const;
++  string ProjectionSelectionKey() const;
++  bool PrepareAtomicSelection(an<Candidate> candidate, uint32_t item_id);
++  bool SelectAtomic(an<Candidate> candidate, uint32_t item_id,
++                    size_t menu_index);
++
++  const uint64_t instance_id_;
++  uint64_t input_revision_ = 1;
++  mutable uint64_t view_revision_ = 1;
++  mutable bool has_projection_ = false;
++  mutable string observed_selection_key_;
++  PreeditProjection projection_;
+   string input_;
+   size_t caret_pos_ = 0;
+   Composition composition_;
+diff --git a/src/rime/engine.cc b/src/rime/engine.cc
+index 07aa6b7d76b9a973c0cfb86a148309af29d0f402..2571813b273bdce3b7550ece27517a751c2cff3e 100644
+--- a/src/rime/engine.cc
++++ b/src/rime/engine.cc
+@@ -229,6 +229,7 @@ void ConcreteEngine::TranslateSegments(Segmentation* segments) {
+     segment.status = Segment::kGuess;
+     segment.menu = menu;
+     segment.selected_index = 0;
++    segment.ClearAlternate();
+   }
+ }
+ 
+diff --git a/src/rime/gear/uniquifier.cc b/src/rime/gear/uniquifier.cc
+index 067e912510732711c209bccf8f7788b0dbdfc8b3..1357135ac00fa247abffe7f5c6d9519f9aeac49c 100644
+--- a/src/rime/gear/uniquifier.cc
++++ b/src/rime/gear/uniquifier.cc
+@@ -6,6 +6,7 @@
+ //
+ #include <rime/candidate.h>
+ #include <rime/common.h>
++#include <rime/interaction/candidate.h>
+ #include <rime/translation.h>
+ #include <rime/gear/uniquifier.h>
+ 
+@@ -34,7 +35,8 @@ static CandidateList::iterator find_text_match(const an<Candidate>& target,
+                                                CandidateList::iterator begin,
+                                                CandidateList::iterator end) {
+   for (auto iter = begin; iter != end; ++iter) {
+-    if ((*iter)->text() == target->text()) {
++    if (!interaction::AsInteraction(*iter) &&
++        (*iter)->text() == target->text()) {
+       return iter;
+     }
+   }
+@@ -44,6 +46,10 @@ static CandidateList::iterator find_text_match(const an<Candidate>& target,
+ bool UniquifiedTranslation::Uniquify() {
+   while (!exhausted()) {
+     auto next = Peek();
++    // Structured items carry source/rod identity independent of visible text.
++    // Keep them intact while ordinary candidates retain the lazy merge path.
++    if (interaction::AsInteraction(next))
++      return true;
+     CandidateList::iterator previous =
+         find_text_match(next, candidates_->begin(), candidates_->end());
+     if (previous == candidates_->end()) {
+diff --git a/src/rime/interaction/api_impl.h b/src/rime/interaction/api_impl.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..fdeffc6fdb3c8c93ccac20a9d6c5623d842c65c2
+--- /dev/null
++++ b/src/rime/interaction/api_impl.h
+@@ -0,0 +1,52 @@
++// implementation of interaction api
++
++#include <rime_interaction_api.h>
++#include <rime/interaction/snapshot.h>
++
++static RimeInteractionSnapshot* rime_interaction_get_snapshot(
++    RimeSessionId session_id) {
++  return rime::interaction::GetSnapshot(session_id);
++}
++
++static void rime_interaction_free_snapshot(
++    RimeInteractionSnapshot* snapshot) {
++  rime::interaction::FreeSnapshot(snapshot);
++}
++
++static Bool rime_interaction_snapshot_is_current(
++    RimeSessionId session_id,
++    const RimeInteractionSnapshot* snapshot) {
++  return rime::interaction::SnapshotIsCurrent(session_id, snapshot);
++}
++
++static int rime_interaction_highlight_item(RimeSessionId session_id,
++                                           RimeInteractionSnapshot* snapshot,
++                                           uint32_t item_id) {
++  return rime::interaction::HighlightItem(session_id, snapshot, item_id);
++}
++
++static int rime_interaction_select_item(RimeSessionId session_id,
++                                        RimeInteractionSnapshot* snapshot,
++                                        uint32_t item_id) {
++  return rime::interaction::SelectItem(session_id, snapshot, item_id);
++}
++
++static RimeCustomApi* rime_interaction_get_api() {
++  static RimeInteractionApi s_api = {0};
++  if (!s_api.data_size) {
++    RIME_STRUCT_INIT(RimeInteractionApi, s_api);
++    s_api.api_version = RIME_INTERACTION_API_VERSION;
++    s_api.get_snapshot = rime_interaction_get_snapshot;
++    s_api.free_snapshot = rime_interaction_free_snapshot;
++    s_api.snapshot_is_current = rime_interaction_snapshot_is_current;
++    s_api.highlight_item = rime_interaction_highlight_item;
++    s_api.select_item = rime_interaction_select_item;
++    s_api.get_item_style = rime::interaction::GetItemStyle;
++    s_api.set_layout = rime::interaction::SetLayout;
++    s_api.neighbor_item = rime::interaction::NeighborItem;
++    s_api.clear_layout = rime::interaction::ClearLayout;
++    s_api.get_preedit = rime::interaction::GetPreeditPresentation;
++    s_api.free_preedit = rime::interaction::FreePreeditPresentation;
++  }
++  return reinterpret_cast<RimeCustomApi*>(&s_api);
++}
+diff --git a/src/rime/interaction/candidate.cc b/src/rime/interaction/candidate.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..bd47eae61b2709e85ed36015ac092eead690cf0c
+--- /dev/null
++++ b/src/rime/interaction/candidate.cc
+@@ -0,0 +1,216 @@
++//
++// Copyright RIME Developers
++// Distributed under the BSD License
++//
++#include <rime/interaction/candidate.h>
++
++namespace rime {
++namespace interaction {
++
++AtomicCandidate::AtomicCandidate(an<Candidate> candidate, uint64_t instance_id,
++                                 uint64_t input_revision, string input,
++                                 string mode)
++    : ShadowCandidate(candidate, candidate->type()),
++      instance_id_(instance_id), input_revision_(input_revision),
++      input_(std::move(input)), mode_(std::move(mode)) {
++  set_start(0);
++  set_end(input_.size());
++}
++
++an<AtomicCandidate> AtomicCandidate::WithPayload(an<Candidate> payload) const {
++  return New<AtomicCandidate>(std::move(payload), instance_id_, input_revision_,
++                              input_, mode_);
++}
++
++namespace {
++bool ContainsAtomic(const an<Candidate>& candidate, int depth) {
++  if (!candidate)
++    return false;
++  if (depth >= 32)
++    return true;  // Unknown deep scope is rejected, never downgraded to plain.
++  if (As<AtomicCandidate>(candidate))
++    return true;
++  if (auto unique = As<UniquifiedCandidate>(candidate)) {
++    for (const auto& item : unique->items())
++      if (ContainsAtomic(item, depth + 1))
++        return true;
++  } else if (auto shadow = As<ShadowCandidate>(candidate)) {
++    return ContainsAtomic(shadow->item(), depth + 1);
++  }
++  return false;
++}
++}  // namespace
++
++bool HasAtomicCandidate(const an<Candidate>& candidate) {
++  return ContainsAtomic(candidate, 0);
++}
++
++an<AtomicCandidate> AsAtomicCandidate(const an<Candidate>& candidate) {
++  an<Candidate> current = candidate;
++  for (int depth = 0; current && depth < 32; ++depth) {
++    if (auto atomic = As<AtomicCandidate>(current))
++      return atomic;
++    if (auto unique = As<UniquifiedCandidate>(current)) {
++      if (unique->items().size() != 1)
++        return nullptr;
++      current = unique->items().front();
++    } else if (auto shadow = As<ShadowCandidate>(current)) {
++      current = shadow->item();
++    } else {
++      break;
++    }
++  }
++  return nullptr;
++}
++
++InteractionCandidate::InteractionCandidate(const an<Candidate>& item,
++                                           ItemKind kind,
++                                           const string& label,
++                                           const string& comment)
++    : ShadowCandidate(item,
++                      item->type(),
++                      string(),
++                      comment,
++                      comment.empty()),
++      kind_(kind),
++      label_(label.empty() ? item->text() : label),
++      label_explicit_(!label.empty()) {
++  if (!comment.empty()) {
++    display_comment_ = comment;
++    has_display_comment_ = true;
++  }
++}
++
++string InteractionCandidate::comment() const {
++  if (has_display_comment_)
++    return display_comment_;
++  return ShadowCandidate::comment();
++}
++
++void InteractionCandidate::set_display_comment(const string& comment) {
++  display_comment_ = comment;
++  has_display_comment_ = true;
++}
++
++bool InteractionCandidate::set_source(an<InteractionCandidate> source) {
++  for (auto* cursor = source.get(); cursor; cursor = cursor->source_.get()) {
++    if (cursor == this)
++      return false;
++  }
++  source_ = std::move(source);
++  return true;
++}
++
++HeldPayload::HeldPayload(const an<Candidate>& genuine,
++                         const Candidate& appearance)
++    : ShadowCandidate(genuine,
++                      appearance.type(),
++                      appearance.text(),
++                      appearance.comment(),
++                      false) {
++  set_start(appearance.start());
++  set_end(appearance.end());
++  set_quality(appearance.quality());
++  preedit_ = appearance.preedit();
++}
++
++string HeldPayload::preedit() const {
++  return preedit_;
++}
++
++static bool SameAppearance(const Candidate& a, const Candidate& b) {
++  return a.text() == b.text() && a.comment() == b.comment() &&
++         a.preedit() == b.preedit() && a.type() == b.type() &&
++         a.start() == b.start() && a.end() == b.end() &&
++         a.quality() == b.quality();
++}
++
++an<Candidate> AcyclicPayload(const an<Candidate>& cand) {
++  if (!cand)
++    return nullptr;
++  if (auto atomic = As<AtomicCandidate>(cand)) {
++    auto inner = AcyclicPayload(atomic->item());
++    return inner ? atomic->WithPayload(inner) : nullptr;
++  }
++  if (auto item = As<InteractionCandidate>(cand)) {
++    auto inner = AcyclicPayload(item->item());
++    if (!inner || SameAppearance(*cand, *inner))
++      return inner;
++    return New<HeldPayload>(inner, *cand);
++  }
++  if (auto uniquified = As<UniquifiedCandidate>(cand)) {
++    if (uniquified->items().empty())
++      return nullptr;
++    CandidateList genuines;
++    genuines.reserve(uniquified->items().size());
++    for (const auto& it : uniquified->items()) {
++      auto held = AcyclicPayload(it);
++      if (!held)
++        return nullptr;
++      genuines.push_back(held);
++    }
++    auto rebuilt = New<UniquifiedCandidate>(
++        genuines.front(), cand->type(), cand->text(), cand->comment());
++    for (size_t i = 1; i < genuines.size(); ++i)
++      rebuilt->Append(genuines[i]);
++    rebuilt->set_start(cand->start());
++    rebuilt->set_end(cand->end());
++    rebuilt->set_quality(cand->quality());
++    if (SameAppearance(*rebuilt, *cand))
++      return rebuilt;
++    return New<HeldPayload>(rebuilt, *cand);
++  }
++  if (auto shadow = As<ShadowCandidate>(cand)) {
++    auto inner = AcyclicPayload(shadow->item());
++    if (!inner)
++      return nullptr;
++    if (SameAppearance(*cand, *inner))
++      return inner;
++    return New<HeldPayload>(inner, *cand);
++  }
++  return cand;
++}
++
++bool InteractionCandidate::Attach(Attachment attachment) {
++  if (attachment.kind == ItemKind::kNotice) {
++    attachment.payload.reset();
++    if (attachment.start == 0 && attachment.end == 0) {
++      attachment.start = start();
++      attachment.end = end();
++    }
++  } else {
++    if (attachment.payload)
++      attachment.payload = AcyclicPayload(attachment.payload);
++    if (!attachment.payload)
++      return false;
++    attachment.start = attachment.payload->start();
++    attachment.end = attachment.payload->end();
++  }
++  if (attachment.label.empty() && attachment.payload)
++    attachment.label = attachment.payload->text();
++  attachments_.push_back(std::move(attachment));
++  return true;
++}
++
++an<InteractionCandidate> AsInteraction(const an<Candidate>& cand) {
++  an<Candidate> cur = cand;
++  for (int depth = 0; cur && depth < 16; ++depth) {
++    if (auto item = As<InteractionCandidate>(cur))
++      return item;
++    if (auto uniquified = As<UniquifiedCandidate>(cur)) {
++      if (uniquified->items().size() != 1)
++        return nullptr;
++      cur = uniquified->items().front();
++      continue;
++    }
++    if (auto shadow = As<ShadowCandidate>(cur)) {
++      cur = shadow->item();
++      continue;
++    }
++    break;
++  }
++  return nullptr;
++}
++
++}  // namespace interaction
++}  // namespace rime
+diff --git a/src/rime/interaction/candidate.h b/src/rime/interaction/candidate.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..4ebafb4747d466da36b3a3abfdd53e016c710888
+--- /dev/null
++++ b/src/rime/interaction/candidate.h
+@@ -0,0 +1,156 @@
++//
++// Copyright RIME Developers
++// Distributed under the BSD License
++//
++#ifndef RIME_INTERACTION_CANDIDATE_H_
++#define RIME_INTERACTION_CANDIDATE_H_
++
++#include <rime/candidate.h>
++#include <rime_interaction_api.h>
++
++namespace rime {
++namespace interaction {
++
++// Explicit whole-composition result. The stamp is copied when interaction
++// back-links are stripped, so a rod payload cannot lose its scope guard.
++class AtomicCandidate : public ShadowCandidate {
++ public:
++  AtomicCandidate(an<Candidate> candidate, uint64_t instance_id,
++                  uint64_t input_revision, string input, string mode);
++  an<AtomicCandidate> WithPayload(an<Candidate> payload) const;
++  uint64_t instance_id() const { return instance_id_; }
++  uint64_t input_revision() const { return input_revision_; }
++  const string& input() const { return input_; }
++  const string& mode() const { return mode_; }
++
++ private:
++  uint64_t instance_id_;
++  uint64_t input_revision_;
++  string input_;
++  string mode_;
++};
++
++bool HasAtomicCandidate(const an<Candidate>& candidate);
++// Ambiguous (multi-item) uniquified results intentionally have no atomic scope.
++an<AtomicCandidate> AsAtomicCandidate(const an<Candidate>& candidate);
++
++enum class ItemKind {
++  kNone = kRimeInteractionKindNone,
++  kSource = kRimeInteractionKindSource,
++  kAssociated = kRimeInteractionKindAssociated,
++  kNotice = kRimeInteractionKindNotice,
++  kOutput = kRimeInteractionKindOutput,
++};
++
++inline const char* KindName(ItemKind kind) {
++  switch (kind) {
++    case ItemKind::kSource:
++      return "source";
++    case ItemKind::kAssociated:
++      return "associated";
++    case ItemKind::kNotice:
++      return "notice";
++    case ItemKind::kOutput:
++      return "output";
++    default:
++      return "";
++  }
++}
++
++inline ItemKind KindFromName(const string& name) {
++  if (name == "source")
++    return ItemKind::kSource;
++  if (name == "associated")
++    return ItemKind::kAssociated;
++  if (name == "notice")
++    return ItemKind::kNotice;
++  if (name == "output")
++    return ItemKind::kOutput;
++  return ItemKind::kNone;
++}
++
++inline const char* ActionName(ItemKind kind) {
++  return kind == ItemKind::kNotice ? "notice" : "commit";
++}
++
++// Rod child. Holds a real Candidate for output items; notice has no payload.
++// These are not inserted into the main candidate page.
++// payload never stores InteractionCandidate: that wrapper may hold source_
++// back to this object and would form a shared_ptr cycle. Store the inner
++// genuine candidate so text() and learning identity stay reachable.
++struct Attachment {
++  ItemKind kind = ItemKind::kNotice;
++  string label;
++  string comment;
++  string hint;  // Display-only prefix, independent of label and real payload.
++  string style_key;  // Display-only profile key; empty inherits the parent style.
++  an<Candidate> payload;
++  size_t start = 0;
++  size_t end = 0;
++};
++
++// Decorates a real candidate (Phrase, SimpleCandidate, ...).
++// Inherits ShadowCandidate so GetGenuineCandidate() reaches the wrapped item.
++class InteractionCandidate : public ShadowCandidate {
++ public:
++  InteractionCandidate(const an<Candidate>& item,
++                       ItemKind kind,
++                       const string& label = string(),
++                       const string& comment = string());
++
++  ItemKind kind() const { return kind_; }
++  void set_kind(ItemKind kind) { kind_ = kind; }
++
++  const string& label() const { return label_; }
++  bool label_explicit() const { return label_explicit_; }
++  void set_label(const string& label) {
++    label_ = label;
++    label_explicit_ = true;
++  }
++
++  const string& style_key() const { return style_key_; }
++  void set_style_key(const string& style_key) { style_key_ = style_key; }
++
++  string comment() const override;
++  void set_display_comment(const string& comment);
++
++  const an<InteractionCandidate>& source() const { return source_; }
++  // Strong ref so a live associated item cannot see a dangling source.
++  // Rejects self-pointer and source chains that would cycle.
++  bool set_source(an<InteractionCandidate> source);
++
++  const vector<Attachment>& attachments() const { return attachments_; }
++  bool Attach(Attachment attachment);
++
++ private:
++  ItemKind kind_ = ItemKind::kSource;
++  string label_;
++  bool label_explicit_ = false;
++  string style_key_;
++  string display_comment_;
++  bool has_display_comment_ = false;
++  an<InteractionCandidate> source_;
++  vector<Attachment> attachments_;
++};
++
++an<InteractionCandidate> AsInteraction(const an<Candidate>& cand);
++// Holds converted appearance while wrapping a genuine learning candidate.
++// GetGenuineCandidate() still reaches genuine_ because this is a Shadow.
++class HeldPayload : public ShadowCandidate {
++ public:
++  HeldPayload(const an<Candidate>& genuine, const Candidate& appearance);
++  string preedit() const override;
++
++ private:
++  string preedit_;
++};
++
++// Strip Interaction source/attachment back-links through Shadow/Interaction
++// layers. Keeps outermost text, preedit, comment, type, start/end, quality.
++// Returns nullptr if a Uniquified set cannot be rebuilt without a cycle.
++an<Candidate> AcyclicPayload(const an<Candidate>& cand);
++
++}  // namespace interaction
++}  // namespace rime
++
++#endif  // RIME_INTERACTION_CANDIDATE_H_
+diff --git a/src/rime/interaction/module.cc b/src/rime/interaction/module.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..81e01471d4983279a52869c7c3f730c404959b63
+--- /dev/null
++++ b/src/rime/interaction/module.cc
+@@ -0,0 +1,18 @@
++//
++// Copyright RIME Developers
++// Distributed under the BSD License
++//
++#include <rime_api.h>
++#include <rime/interaction/snapshot.h>
++
++static void rime_interaction_initialize() {}
++
++static void rime_interaction_finalize() {
++  rime::interaction::ResetSnapshotState();
++}
++
++#include "api_impl.h"
++
++RIME_REGISTER_CUSTOM_MODULE(interaction) {
++  module->get_api = rime_interaction_get_api;
++}
+diff --git a/src/rime/interaction/snapshot.cc b/src/rime/interaction/snapshot.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..c7172c0e615822c211cb516aa053fa47dabb36d8
+--- /dev/null
++++ b/src/rime/interaction/snapshot.cc
+@@ -0,0 +1,899 @@
++//
++// Copyright RIME Developers
++// Distributed under the BSD License
++//
++#include <rime/interaction/snapshot.h>
++
++#include <algorithm>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <mutex>
++#include <unordered_map>
++#include <unordered_set>
++
++#include <rime/context.h>
++#include <rime/engine.h>
++#include <rime/interaction/candidate.h>
++#include <rime/menu.h>
++#include <rime/segmentation.h>
++#include <rime/schema.h>
++#include <rime/service.h>
++
++namespace rime {
++namespace interaction {
++namespace {
++
++char* DupStr(const string& value) {
++  if (value.empty())
++    return nullptr;
++  char* out = new char[value.size() + 1];
++  std::memcpy(out, value.c_str(), value.size() + 1);
++  return out;
++}
++
++struct SnapshotHolder {
++  RimeInteractionSnapshot view{};
++  vector<an<Candidate>> payloads;
++  vector<string> style_keys;
++  an<Menu> menu;
++  SessionId session_id = 0;
++  uint32_t generation = 0;
++  bool valid = true;
++};
++
++struct SpatialNode {
++  RimeInteractionRect rect{};
++  uint32_t anchor = 0;
++  bool rod = false;
++};
++
++struct SpatialLayout {
++  uint32_t generation = 0;
++  uint64_t frame_token = 0;
++  uint64_t revision = 0;
++  vector<SpatialNode> nodes;
++};
++
++struct SessionState {
++  uint32_t generation = 0;
++  string fingerprint;
++  SpatialLayout layout;
++  vector<uint64_t> retired_frames;
++};
++
++std::mutex g_mutex;
++map<SessionId, SessionState> g_sessions;
++std::unordered_set<SnapshotHolder*> g_holders;
++std::unordered_set<RimeInteractionPreedit*> g_preedits;
++
++void DestroyPreedit(RimeInteractionPreedit* value) {
++  delete[] value->text;
++  for (int i = 0; i < value->span_count; ++i)
++    delete[] value->spans[i].style_key;
++  delete[] value->spans;
++  delete value;
++}
++
++void ClearView(RimeInteractionSnapshot* view) {
++  if (!view)
++    return;
++  delete[] view->schema_id;
++  delete[] view->input;
++  if (view->items) {
++    for (int i = 0; i < view->item_count; ++i) {
++      delete[] view->items[i].label;
++      delete[] view->items[i].comment;
++      delete[] view->items[i].text;
++      delete[] view->items[i].action;
++      delete[] view->items[i].hint;
++    }
++    delete[] view->items;
++  }
++  view->schema_id = nullptr;
++  view->input = nullptr;
++  view->items = nullptr;
++  view->item_count = 0;
++}
++
++void AppendTagged(string* fp, char tag, const string& value) {
++  fp->push_back(tag);
++  fp->append(std::to_string(value.size()));
++  fp->push_back(':');
++  fp->append(value);
++  fp->push_back(';');
++}
++
++void AppendTagged(string* fp, char tag, uint64_t value) {
++  fp->push_back(tag);
++  fp->append(std::to_string(value));
++  fp->push_back(';');
++}
++
++string CandidateText(const an<Candidate>& cand) {
++  return cand ? cand->text() : string();
++}
++
++void FingerprintCandidate(string* fp, const an<Candidate>& cand) {
++  if (!cand) {
++    AppendTagged(fp, 'N', uint64_t{0});
++    return;
++  }
++  // Instance token is internal to generation. It is not a public item id.
++  AppendTagged(fp, 'P', static_cast<uint64_t>(reinterpret_cast<uintptr_t>(cand.get())));
++  AppendTagged(fp, 'Y', cand->type());
++  AppendTagged(fp, 'T', cand->text());
++  AppendTagged(fp, 'c', cand->comment());
++  AppendTagged(fp, 'S', static_cast<uint64_t>(cand->start()));
++  AppendTagged(fp, 'E', static_cast<uint64_t>(cand->end()));
++  if (auto item = AsInteraction(cand)) {
++    AppendTagged(fp, 'K', string(KindName(item->kind())));
++    AppendTagged(fp, 'L', item->label());
++    AppendTagged(fp, 'l', static_cast<uint64_t>(item->label_explicit()));
++    AppendTagged(fp, 'C', item->comment());
++    AppendTagged(fp, 'Z', item->style_key());
++    if (item->source()) {
++      AppendTagged(fp, 'R', static_cast<uint64_t>(
++                                reinterpret_cast<uintptr_t>(item->source().get())));
++      AppendTagged(fp, 'U', item->source()->type());
++      AppendTagged(fp, 'V', item->source()->text());
++    } else {
++      AppendTagged(fp, 'R', uint64_t{0});
++    }
++    AppendTagged(fp, 'A', static_cast<uint64_t>(item->attachments().size()));
++    for (const auto& row : item->attachments()) {
++      AppendTagged(fp, 'k', string(KindName(row.kind)));
++      AppendTagged(fp, 'l', row.label);
++      AppendTagged(fp, 'c', row.comment);
++      AppendTagged(fp, 'h', row.hint);
++      AppendTagged(fp, 'z', row.style_key);
++      AppendTagged(fp, 't', CandidateText(row.payload));
++      AppendTagged(fp, 's', static_cast<uint64_t>(row.start));
++      AppendTagged(fp, 'e', static_cast<uint64_t>(row.end));
++    }
++  } else {
++    AppendTagged(fp, 'K', string("plain"));
++  }
++}
++
++string MakeFingerprint(Session* session) {
++  string fp;
++  Schema* schema = session->schema();
++  Context* ctx = session->context();
++  AppendTagged(&fp, 'H', schema ? schema->schema_id() : string());
++  AppendTagged(&fp, 'I', ctx ? ctx->input() : string());
++  if (!ctx)
++    return fp;
++  // An edit that restores the same bytes must still retire the old payloads.
++  // Caret motion also changes the active segment and the candidate view, while
++  // candidate highlighting alone deliberately leaves the generation unchanged.
++  AppendTagged(&fp, 'r', ctx->input_revision());
++  AppendTagged(&fp, 'p', static_cast<uint64_t>(ctx->caret_pos()));
++  const auto& composition = ctx->composition();
++  AppendTagged(&fp, 'G', static_cast<uint64_t>(composition.size()));
++  for (const auto& segment : composition) {
++    AppendTagged(&fp, 'B', static_cast<uint64_t>(segment.start));
++    AppendTagged(&fp, 'D', static_cast<uint64_t>(segment.end));
++    if (!segment.menu) {
++      AppendTagged(&fp, 'M', uint64_t{0});
++      continue;
++    }
++    AppendTagged(&fp, 'M', static_cast<uint64_t>(
++                               reinterpret_cast<uintptr_t>(segment.menu.get())));
++    size_t page_size = schema ? static_cast<size_t>(schema->page_size()) : 5;
++    size_t want = (std::max)(segment.menu->candidate_count(), page_size);
++    segment.menu->Prepare(want);
++    AppendTagged(&fp, 'Q', static_cast<uint64_t>(segment.menu->candidate_count()));
++    for (size_t i = 0; i < segment.menu->candidate_count(); ++i) {
++      FingerprintCandidate(&fp, segment.menu->GetCandidateAt(i));
++    }
++  }
++  return fp;
++}
++
++uint32_t TouchGeneration(SessionId session_id, Session* session) {
++  string fp = MakeFingerprint(session);
++  auto& state = g_sessions[session_id];
++  if (state.fingerprint != fp) {
++    ++state.generation;
++    if (state.generation == 0)
++      ++state.generation;
++    state.fingerprint = std::move(fp);
++    state.layout = SpatialLayout{};
++    state.retired_frames.clear();
++  }
++  return state.generation;
++}
++
++struct ExportItem {
++  uint32_t id = 0;
++  uint32_t source_id = 0;
++  uint32_t attached_to_id = 0;
++  ItemKind kind = ItemKind::kOutput;
++  string label;
++  string comment;
++  string text;
++  string action;
++  string hint;
++  string style_key;
++  int start = 0;
++  int end = 0;
++  int menu_index = -1;
++  uint32_t rod_id = 0;
++  int rod_index = -1;
++  an<Candidate> payload;
++  InteractionCandidate* source_ptr = nullptr;
++  InteractionCandidate* parent_ptr = nullptr;
++};
++
++void FillFromCandidate(ExportItem* dest, const an<Candidate>& cand) {
++  dest->label = cand ? cand->text() : string();
++  dest->comment = cand ? cand->comment() : string();
++  dest->text = cand ? cand->text() : string();
++  dest->start = cand ? static_cast<int>(cand->start()) : 0;
++  dest->end = cand ? static_cast<int>(cand->end()) : 0;
++  dest->payload = cand;
++  dest->kind = ItemKind::kOutput;
++  dest->action = ActionName(dest->kind);
++}
++
++void FillFromInteraction(ExportItem* dest, const an<InteractionCandidate>& item) {
++  dest->kind = item->kind();
++  dest->label = item->label();
++  dest->comment = item->comment();
++  dest->text = item->text();
++  dest->start = static_cast<int>(item->start());
++  dest->end = static_cast<int>(item->end());
++  dest->payload = item;
++  dest->action = ActionName(item->kind());
++  dest->source_ptr = item->source().get();
++  dest->style_key = item->style_key();
++}
++
++void FillFromMenuCandidate(ExportItem* dest, const an<Candidate>& cand) {
++  auto interaction = AsInteraction(cand);
++  if (!interaction) {
++    FillFromCandidate(dest, cand);
++    return;
++  }
++  dest->kind = interaction->kind();
++  dest->action = ActionName(interaction->kind());
++  dest->source_ptr = interaction->source().get();
++  dest->style_key = interaction->style_key();
++  dest->payload = cand;
++  dest->text = cand->text();
++  dest->comment = cand->comment();
++  dest->start = static_cast<int>(cand->start());
++  dest->end = static_cast<int>(cand->end());
++  if (interaction->label_explicit())
++    dest->label = interaction->label();
++  else
++    dest->label = cand->text();
++}
++
++void FillFromAttachment(ExportItem* dest,
++                        const Attachment& row,
++                        InteractionCandidate* parent) {
++  dest->kind = row.kind;
++  dest->label = row.label;
++  dest->comment = row.comment;
++  dest->hint = row.hint;
++  dest->style_key = row.style_key;
++  dest->text = row.payload ? row.payload->text() : string();
++  dest->start = static_cast<int>(row.start);
++  dest->end = static_cast<int>(row.end);
++  dest->payload = row.payload;
++  dest->action = ActionName(row.kind);
++  dest->parent_ptr = parent;
++  dest->source_ptr = parent && parent->source() ? parent->source().get()
++                                                : parent;
++}
++
++}  // namespace
++
++RimeInteractionSnapshot* GetSnapshot(SessionId session_id) {
++  an<Session> session = Service::instance().GetSession(session_id);
++  if (!session)
++    return nullptr;
++
++  std::lock_guard<std::mutex> lock(g_mutex);
++  uint32_t generation = TouchGeneration(session_id, session.get());
++
++  vector<ExportItem> exported;
++  std::unordered_map<InteractionCandidate*, uint32_t> ids;
++  auto add_item = [&](ExportItem item) {
++    item.id = static_cast<uint32_t>(exported.size() + 1);
++    if (auto interaction = AsInteraction(item.payload))
++      ids[interaction.get()] = item.id;
++    exported.push_back(std::move(item));
++    return exported.back().id;
++  };
++
++  Context* ctx = session->context();
++  Schema* schema = session->schema();
++  if (ctx && ctx->HasMenu()) {
++    Segment& segment = ctx->composition().back();
++    if (segment.menu) {
++      size_t page_size = schema ? static_cast<size_t>(schema->page_size()) : 5;
++      size_t want = (std::max)(segment.menu->candidate_count(), page_size);
++      segment.menu->Prepare(want);
++      std::unordered_set<InteractionCandidate*> on_menu;
++      for (size_t i = 0; i < segment.menu->candidate_count(); ++i) {
++        if (auto interaction = AsInteraction(segment.menu->GetCandidateAt(i)))
++          on_menu.insert(interaction.get());
++      }
++      for (size_t i = 0; i < segment.menu->candidate_count(); ++i) {
++        auto interaction = AsInteraction(segment.menu->GetCandidateAt(i));
++        if (!interaction || !interaction->source())
++          continue;
++        auto source = interaction->source();
++        if (on_menu.count(source.get()) || ids.count(source.get()))
++          continue;
++        ExportItem item;
++        FillFromInteraction(&item, source);
++        item.menu_index = -1;
++        add_item(std::move(item));
++      }
++      for (size_t i = 0; i < segment.menu->candidate_count(); ++i) {
++        an<Candidate> cand = segment.menu->GetCandidateAt(i);
++        ExportItem item;
++        FillFromMenuCandidate(&item, cand);
++        auto interaction = AsInteraction(cand);
++        item.menu_index = static_cast<int>(i);
++        uint32_t parent_id = add_item(std::move(item));
++        if (!interaction)
++          continue;
++        int rod_index = 0;
++        for (const auto& row : interaction->attachments()) {
++          ExportItem rod;
++          FillFromAttachment(&rod, row, interaction.get());
++          rod.menu_index = -1;
++          rod.rod_id = parent_id;
++          rod.rod_index = rod_index++;
++          rod.attached_to_id = parent_id;
++          add_item(std::move(rod));
++        }
++      }
++    }
++  }
++
++  for (auto& item : exported) {
++    if (item.source_ptr) {
++      auto it = ids.find(item.source_ptr);
++      if (it != ids.end())
++        item.source_id = it->second;
++    }
++    if (item.parent_ptr) {
++      auto it = ids.find(item.parent_ptr);
++      if (it != ids.end())
++        item.attached_to_id = it->second;
++    }
++  }
++
++  the<SnapshotHolder> holder(new SnapshotHolder);
++  RIME_STRUCT_INIT(RimeInteractionSnapshot, holder->view);
++  holder->view.api_version = RIME_INTERACTION_API_VERSION;
++  holder->view.generation = generation;
++  holder->view.session_id = session_id;
++  holder->view.schema_id = DupStr(schema ? schema->schema_id() : string());
++  holder->view.input = DupStr(ctx ? ctx->input() : string());
++  holder->view.item_count = static_cast<int>(exported.size());
++  holder->view.active_item_id = 0;
++  holder->session_id = session_id;
++  holder->generation = generation;
++  if (ctx && ctx->HasMenu()) {
++    Segment& live = ctx->composition().back();
++    holder->menu = live.menu;
++    if (live.HasAlternate() && live.alternate_item_id) {
++      holder->view.active_item_id = live.alternate_item_id;
++    } else {
++      for (const auto& src : exported) {
++        if (src.menu_index >= 0 &&
++            src.menu_index == static_cast<int>(live.selected_index)) {
++          holder->view.active_item_id = src.id;
++          break;
++        }
++      }
++    }
++  }
++  if (!exported.empty()) {
++    holder->view.items = new RimeInteractionItem[exported.size()];
++    std::memset(holder->view.items, 0,
++                sizeof(RimeInteractionItem) * exported.size());
++    for (size_t i = 0; i < exported.size(); ++i) {
++      const ExportItem& src = exported[i];
++      RimeInteractionItem& dest = holder->view.items[i];
++      dest.id = src.id;
++      dest.source_id = src.source_id;
++      dest.attached_to_id = src.attached_to_id;
++      dest.kind = static_cast<int>(src.kind);
++      dest.label = DupStr(src.label);
++      dest.comment = DupStr(src.comment);
++      dest.text = DupStr(src.text);
++      dest.action = DupStr(src.action);
++      dest.hint = DupStr(src.hint);
++      dest.start = src.start;
++      dest.end = src.end;
++      dest.menu_index = src.menu_index;
++      dest.rod_id = src.rod_id;
++      dest.rod_index = src.rod_index;
++      holder->payloads.push_back(src.payload);
++      holder->style_keys.push_back(src.style_key);
++    }
++  }
++
++  SnapshotHolder* raw = holder.release();
++  g_holders.insert(raw);
++  return &raw->view;
++}
++
++void FreeSnapshot(RimeInteractionSnapshot* snapshot) {
++  if (!snapshot)
++    return;
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto* holder = reinterpret_cast<SnapshotHolder*>(snapshot);
++  auto it = g_holders.find(holder);
++  if (it == g_holders.end())
++    return;
++  g_holders.erase(it);
++  ClearView(&holder->view);
++  delete holder;
++}
++
++Bool SnapshotIsCurrent(SessionId session_id,
++                       const RimeInteractionSnapshot* snapshot) {
++  if (!snapshot)
++    return False;
++  an<Session> session = Service::instance().GetSession(session_id);
++  if (!session)
++    return False;
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto* holder = reinterpret_cast<SnapshotHolder*>(
++      const_cast<RimeInteractionSnapshot*>(snapshot));
++  if (g_holders.find(holder) == g_holders.end())
++    return False;
++  if (!holder->valid || holder->session_id != session_id)
++    return False;
++  uint32_t generation = TouchGeneration(session_id, session.get());
++  return Bool(snapshot->session_id == session_id &&
++              snapshot->generation == generation &&
++              holder->generation == generation);
++}
++
++struct ItemTarget {
++  an<Candidate> payload;
++  int menu_index = -1;
++  int anchor_index = -1;
++};
++
++static int LookupPayload(SessionId session_id,
++                         RimeInteractionSnapshot* snapshot,
++                         uint32_t item_id,
++                         ItemTarget* target) {
++  if (!snapshot || item_id == 0 || !target)
++    return kRimeInteractionInvalid;
++  an<Session> session = Service::instance().GetSession(session_id);
++  if (!session || !session->context())
++    return kRimeInteractionInvalid;
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto* holder = reinterpret_cast<SnapshotHolder*>(snapshot);
++  if (g_holders.find(holder) == g_holders.end())
++    return kRimeInteractionInvalid;
++  if (!holder->valid)
++    return kRimeInteractionExpired;
++  if (snapshot->session_id != session_id || holder->session_id != session_id)
++    return kRimeInteractionInvalid;
++  uint32_t generation = TouchGeneration(session_id, session.get());
++  if (snapshot->generation != generation || holder->generation != generation)
++    return kRimeInteractionExpired;
++  const string& input = session->context()->input();
++  if (snapshot->input && input != snapshot->input)
++    return kRimeInteractionExpired;
++  int found = -1;
++  for (int i = 0; i < snapshot->item_count; ++i) {
++    if (snapshot->items[i].id == item_id) {
++      found = i;
++      break;
++    }
++  }
++  if (found < 0)
++    return kRimeInteractionInvalid;
++  const RimeInteractionItem& item = snapshot->items[found];
++  if (item.start < 0 || item.end < item.start ||
++      static_cast<size_t>(item.end) > input.size()) {
++    return kRimeInteractionExpired;
++  }
++  auto utf8_boundary = [](const string& s, size_t pos) {
++    if (pos > s.size())
++      return false;
++    if (pos == 0 || pos == s.size())
++      return true;
++    return (static_cast<unsigned char>(s[pos]) & 0xC0) != 0x80;
++  };
++  if (!utf8_boundary(input, static_cast<size_t>(item.start)) ||
++      !utf8_boundary(input, static_cast<size_t>(item.end))) {
++    return kRimeInteractionInvalid;
++  }
++  const char* action = item.action ? item.action : "";
++  if (item.kind == kRimeInteractionKindNotice ||
++      std::strcmp(action, "commit") != 0 ||
++      found >= static_cast<int>(holder->payloads.size()) ||
++      !holder->payloads[found]) {
++    return kRimeInteractionNotOutput;
++  }
++  an<Candidate> payload = holder->payloads[found];
++  if (payload->start() != static_cast<size_t>(item.start) ||
++      payload->end() != static_cast<size_t>(item.end)) {
++    return kRimeInteractionExpired;
++  }
++  if (session->context()->composition().empty())
++    return kRimeInteractionInvalid;
++  const Segment& seg = session->context()->composition().back();
++  if (seg.status >= Segment::kSelected)
++    return kRimeInteractionExpired;
++  const bool atomic = HasAtomicCandidate(payload);
++  // Whole-input results are explicit, context-bound candidates.  Do not grant
++  // ordinary candidates wider coverage merely because they claim that range.
++  if (atomic &&
++      (!session->context()->IsAtomicCandidateCurrent(payload) ||
++       item.start != 0 || static_cast<size_t>(item.end) != input.size())) {
++    return kRimeInteractionExpired;
++  }
++  if (!atomic && (static_cast<size_t>(item.start) < seg.start ||
++                  static_cast<size_t>(item.end) > seg.end)) {
++    return kRimeInteractionExpired;
++  }
++  target->payload = payload;
++  target->menu_index = item.menu_index;
++  target->anchor_index = item.menu_index;
++  if (item.menu_index < 0) {
++    if (!item.attached_to_id)
++      return kRimeInteractionInvalid;
++    for (int i = 0; i < snapshot->item_count; ++i) {
++      if (snapshot->items[i].id == item.attached_to_id) {
++        target->anchor_index = snapshot->items[i].menu_index;
++        break;
++      }
++    }
++    if (target->anchor_index < 0)
++      return kRimeInteractionInvalid;
++  }
++  return kRimeInteractionOk;
++}
++
++static void RememberActive(RimeInteractionSnapshot* snapshot, uint32_t item_id) {
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto* holder = reinterpret_cast<SnapshotHolder*>(snapshot);
++  if (g_holders.find(holder) != g_holders.end() && holder->valid)
++    holder->view.active_item_id = item_id;
++}
++
++int HighlightItem(SessionId session_id,
++                  RimeInteractionSnapshot* snapshot,
++                  uint32_t item_id) {
++  ItemTarget target;
++  int status = LookupPayload(session_id, snapshot, item_id, &target);
++  if (status != kRimeInteractionOk)
++    return status;
++  an<Session> session = Service::instance().GetSession(session_id);
++  if (!session || !session->context())
++    return kRimeInteractionInvalid;
++  Context* ctx = session->context();
++  if (target.menu_index >= 0) {
++    ctx->Highlight(static_cast<size_t>(target.menu_index));
++  } else {
++    ctx->Highlight(static_cast<size_t>(target.anchor_index));
++    if (!ctx->HighlightAlternate(target.payload, item_id))
++      return kRimeInteractionInvalid;
++  }
++  RememberActive(snapshot, item_id);
++  return kRimeInteractionOk;
++}
++
++int SelectItem(SessionId session_id,
++               RimeInteractionSnapshot* snapshot,
++               uint32_t item_id) {
++  ItemTarget target;
++  int status = LookupPayload(session_id, snapshot, item_id, &target);
++  if (status != kRimeInteractionOk)
++    return status;
++  an<Session> session = Service::instance().GetSession(session_id);
++  if (!session || !session->context())
++    return kRimeInteractionInvalid;
++  Context* ctx = session->context();
++  if (target.menu_index >= 0) {
++    if (!ctx->Select(static_cast<size_t>(target.menu_index)))
++      return kRimeInteractionInvalid;
++  } else {
++    ctx->Highlight(static_cast<size_t>(target.anchor_index));
++    if (!ctx->SelectAlternate(target.payload, item_id))
++      return kRimeInteractionInvalid;
++  }
++  RememberActive(snapshot, item_id);
++  return kRimeInteractionOk;
++}
++
++const char* GetItemStyle(const RimeInteractionSnapshot* snapshot,
++                          uint32_t item_id) {
++  if (!snapshot || !item_id)
++    return nullptr;
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto* holder = reinterpret_cast<const SnapshotHolder*>(snapshot);
++  if (!g_holders.count(const_cast<SnapshotHolder*>(holder)))
++    return nullptr;
++  for (int i = 0; i < holder->view.item_count; ++i)
++    if (holder->view.items[i].id == item_id &&
++        static_cast<size_t>(i) < holder->style_keys.size())
++      return holder->style_keys[i].c_str();
++  return nullptr;
++}
++
++RimeInteractionPreedit* GetPreeditPresentation(SessionId session_id) {
++  auto session = Service::instance().GetSession(session_id);
++  if (!session || !session->context())
++    return nullptr;
++  auto* ctx = session->context();
++  const auto preedit = ctx->GetPreedit();
++  const auto regions = ctx->GetPreeditRegions();
++  if (preedit.text.size() > 128 * 1024 || regions.size() > 192)
++    return nullptr;
++  auto* value = new RimeInteractionPreedit{};
++  RIME_STRUCT_INIT(RimeInteractionPreedit, *value);
++  value->text = DupStr(preedit.text);
++  value->span_count = static_cast<int>(regions.size());
++  value->spans = new RimeInteractionTextSpan[regions.size()]{};
++  for (size_t i = 0; i < regions.size(); ++i) {
++    const auto& region = regions[i];
++    value->spans[i].start = static_cast<int>(region.start);
++    value->spans[i].end = static_cast<int>(region.end);
++    value->spans[i].style_key = DupStr(region.style_key);
++    value->spans[i].highlightable = region.highlightable ? True : False;
++  }
++  std::lock_guard<std::mutex> lock(g_mutex);
++  g_preedits.insert(value);
++  return value;
++}
++
++void FreePreeditPresentation(RimeInteractionPreedit* value) {
++  if (!value)
++    return;
++  std::lock_guard<std::mutex> lock(g_mutex);
++  if (g_preedits.erase(value))
++    DestroyPreedit(value);
++}
++
++namespace {
++// Caller holds g_mutex. Layout publication changes no Context property and
++// sends no notifier, so a pre-key report cannot re-enter composition/UI work.
++int CurrentLayoutSnapshot(SessionId sid, const RimeInteractionSnapshot* snapshot,
++                           Session* session, SnapshotHolder** result) {
++  if (!snapshot || !session || !session->context())
++    return kRimeInteractionInvalid;
++  auto* holder = reinterpret_cast<SnapshotHolder*>(
++      const_cast<RimeInteractionSnapshot*>(snapshot));
++  if (!g_holders.count(holder))
++    return kRimeInteractionInvalid;
++  if (holder->session_id != sid || holder->view.session_id != sid)
++    return kRimeInteractionInvalid;
++  if (!holder->valid || TouchGeneration(sid, session) != holder->generation ||
++      holder->view.generation != holder->generation)
++    return kRimeInteractionExpired;
++  *result = holder;
++  return kRimeInteractionOk;
++}
++
++const RimeInteractionItem* FindItem(const SnapshotHolder& holder, uint32_t id) {
++  for (int i = 0; i < holder.view.item_count; ++i)
++    if (holder.view.items[i].id == id)
++      return &holder.view.items[i];
++  return nullptr;
++}
++
++bool IsOutput(const RimeInteractionItem& item) {
++  return item.kind != kRimeInteractionKindNotice && item.action &&
++         std::strcmp(item.action, "commit") == 0;
++}
++
++int64_t CenterX2(const SpatialNode& node) {
++  return int64_t(node.rect.left) + node.rect.right;
++}
++int64_t CenterY2(const SpatialNode& node) {
++  return int64_t(node.rect.top) + node.rect.bottom;
++}
++void RetireFrame(SessionState* state) {
++  if (state->layout.frame_token) {
++    state->retired_frames.push_back(state->layout.frame_token);
++    if (state->retired_frames.size() > 32)
++      state->retired_frames.erase(state->retired_frames.begin());
++  }
++  state->layout = SpatialLayout{};
++}
++}  // namespace
++
++int SetLayout(SessionId session_id, const RimeInteractionSnapshot* snapshot,
++                uint64_t frame_token, uint64_t layout_revision,
++                const RimeInteractionRect* rectangles, int rectangle_count) {
++  constexpr int kMaxRectangles = 256;
++  constexpr int kCoordinateLimit = 1000000;
++  if (!frame_token || !layout_revision || rectangle_count < 0 ||
++      rectangle_count > kMaxRectangles || (rectangle_count && !rectangles))
++    return kRimeInteractionInvalid;
++  auto session = Service::instance().GetSession(session_id);
++  std::lock_guard<std::mutex> lock(g_mutex);
++  SnapshotHolder* holder = nullptr;
++  const int status = CurrentLayoutSnapshot(session_id, snapshot, session.get(),
++                                            &holder);
++  if (status != kRimeInteractionOk)
++    return status;
++  auto& state = g_sessions[session_id];
++  if (std::find(state.retired_frames.begin(), state.retired_frames.end(),
++                frame_token) != state.retired_frames.end() ||
++      (state.layout.frame_token == frame_token &&
++       layout_revision <= state.layout.revision))
++    return kRimeInteractionExpired;
++  SpatialLayout next;
++  next.generation = holder->generation;
++  next.frame_token = frame_token;
++  next.revision = layout_revision;
++  std::unordered_set<uint32_t> ids;
++  for (int i = 0; i < rectangle_count; ++i) {
++    const auto& rect = rectangles[i];
++    const auto* item = FindItem(*holder, rect.item_id);
++    if (!item || !IsOutput(*item) || !ids.insert(rect.item_id).second ||
++        rect.left < -kCoordinateLimit || rect.top < -kCoordinateLimit ||
++        rect.right > kCoordinateLimit || rect.bottom > kCoordinateLimit ||
++        rect.left >= rect.right || rect.top >= rect.bottom)
++      return kRimeInteractionInvalid;
++    const bool rod = item->menu_index < 0;
++    if (rod && (!item->attached_to_id || !item->rod_id))
++      return kRimeInteractionInvalid;
++    next.nodes.push_back({rect, rod ? item->attached_to_id : item->id, rod});
++  }
++  // Every measured lower item belongs to a measured main item. Off-page
++  // source references cannot become accidental spatial targets.
++  for (const auto& node : next.nodes) {
++    if (!node.rod)
++      continue;
++    auto anchor = std::find_if(next.nodes.begin(), next.nodes.end(),
++        [&](const SpatialNode& value) {
++          return !value.rod && value.rect.item_id == node.anchor;
++        });
++    if (anchor == next.nodes.end())
++      return kRimeInteractionInvalid;
++  }
++  if (state.layout.frame_token && state.layout.frame_token != frame_token)
++    RetireFrame(&state);
++  state.layout = std::move(next);
++  return kRimeInteractionOk;
++}
++
++int NeighborItem(SessionId session_id, const RimeInteractionSnapshot* snapshot,
++                   uint32_t item_id, int direction, uint32_t* target_id) {
++  if (target_id)
++    *target_id = 0;
++  if (!target_id || !item_id || direction < kRimeInteractionLeft ||
++      direction > kRimeInteractionDown)
++    return kRimeInteractionInvalid;
++  auto session = Service::instance().GetSession(session_id);
++  std::lock_guard<std::mutex> lock(g_mutex);
++  SnapshotHolder* holder = nullptr;
++  const int status = CurrentLayoutSnapshot(session_id, snapshot, session.get(),
++                                            &holder);
++  if (status != kRimeInteractionOk)
++    return status;
++  const auto& layout = g_sessions[session_id].layout;
++  if (layout.generation != holder->generation || layout.nodes.empty())
++    return kRimeInteractionExpired;
++  const SpatialNode* current = nullptr;
++  const SpatialNode* current_header = nullptr;
++  for (const auto& node : layout.nodes)
++    if (node.rect.item_id == item_id)
++      current = &node;
++  if (!current)
++    return kRimeInteractionInvalid;
++  for (const auto& node : layout.nodes)
++    if (!node.rod && node.rect.item_id == current->anchor)
++      current_header = &node;
++  if (!current_header)
++    return kRimeInteractionInvalid;
++  const SpatialNode* target = nullptr;
++  int64_t distance = (std::numeric_limits<int64_t>::max)();
++  if (direction == kRimeInteractionUp || direction == kRimeInteractionDown) {
++    // Up from the top output returns its main item. Notices are not targets;
++    // neither motion nor an absent item silently wraps to a different column.
++    for (const auto& node : layout.nodes) {
++      if (node.anchor != current->anchor || node.rect.item_id == item_id)
++        continue;
++      const int64_t delta = CenterY2(node) - CenterY2(*current);
++      if ((direction == kRimeInteractionUp && delta >= 0) ||
++          (direction == kRimeInteractionDown && delta <= 0))
++        continue;
++      const int64_t candidate_distance = delta < 0 ? -delta : delta;
++      if (candidate_distance < distance) {
++        target = &node;
++        distance = candidate_distance;
++      }
++    }
++  } else {
++    // First choose the immediately adjacent visible column in this main band.
++    // A short/empty adjacent rod is a wall, never a reason to skip over it.
++    const SpatialNode* adjacent = nullptr;
++    for (const auto& header : layout.nodes) {
++      if (header.rod || header.anchor == current->anchor ||
++          header.rect.top >= current_header->rect.bottom ||
++          header.rect.bottom <= current_header->rect.top)
++        continue;
++      const int64_t delta = CenterX2(header) - CenterX2(*current_header);
++      if ((direction == kRimeInteractionLeft && delta >= 0) ||
++          (direction == kRimeInteractionRight && delta <= 0))
++        continue;
++      const int64_t candidate_distance = delta < 0 ? -delta : delta;
++      if (candidate_distance < distance) {
++        adjacent = &header;
++        distance = candidate_distance;
++      }
++    }
++    if (adjacent) {
++      distance = (std::numeric_limits<int64_t>::max)();
++      const int64_t y = CenterY2(*current);
++      for (const auto& node : layout.nodes) {
++        if (node.anchor != adjacent->anchor || node.rod != current->rod ||
++            2 * int64_t(node.rect.top) > y ||
++            2 * int64_t(node.rect.bottom) <= y)
++          continue;
++        const int64_t delta = CenterY2(node) - y;
++        const int64_t candidate_distance = delta < 0 ? -delta : delta;
++        if (candidate_distance < distance) {
++          target = &node;
++          distance = candidate_distance;
++        }
++      }
++    }
++  }
++  if (target)
++    *target_id = target->rect.item_id;
++  return kRimeInteractionOk;
++}
++
++void ClearLayout(SessionId session_id) {
++  std::lock_guard<std::mutex> lock(g_mutex);
++  auto found = g_sessions.find(session_id);
++  if (found != g_sessions.end())
++    RetireFrame(&found->second);
++}
++
++void ForgetSession(SessionId session_id) {
++  // Keep exported strings/items readable until FreeSnapshot, but never allow a
++  // retired snapshot to revive if a Session address and generation are reused.
++  // Candidate/Menu destructors can run Lua finalizers, so release them only
++  // after the interaction lock has been dropped.
++  vector<vector<an<Candidate>>> retired_payloads;
++  vector<an<Menu>> retired_menus;
++  {
++    std::lock_guard<std::mutex> lock(g_mutex);
++    g_sessions.erase(session_id);
++    for (auto* holder : g_holders) {
++      if (holder->session_id != session_id || !holder->valid)
++        continue;
++      holder->valid = false;
++      retired_payloads.push_back(std::move(holder->payloads));
++      retired_menus.push_back(std::move(holder->menu));
++    }
++  }
++}
++
++void ResetSnapshotState() {
++  std::lock_guard<std::mutex> lock(g_mutex);
++  g_sessions.clear();
++  for (auto* holder : g_holders) {
++    ClearView(&holder->view);
++    delete holder;
++  }
++  g_holders.clear();
++  for (auto* value : g_preedits)
++    DestroyPreedit(value);
++  g_preedits.clear();
++}
++
++}  // namespace interaction
++}  // namespace rime
+diff --git a/src/rime/interaction/snapshot.h b/src/rime/interaction/snapshot.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4f2c064f784594cccf0135afcc7ff13e6b1bf8d
+--- /dev/null
++++ b/src/rime/interaction/snapshot.h
+@@ -0,0 +1,40 @@
++//
++// Copyright RIME Developers
++// Distributed under the BSD License
++//
++#ifndef RIME_INTERACTION_SNAPSHOT_H_
++#define RIME_INTERACTION_SNAPSHOT_H_
++
++#include <rime/common.h>
++#include <rime/service.h>
++#include <rime_interaction_api.h>
++
++namespace rime {
++namespace interaction {
++
++RimeInteractionSnapshot* GetSnapshot(SessionId session_id);
++void FreeSnapshot(RimeInteractionSnapshot* snapshot);
++Bool SnapshotIsCurrent(SessionId session_id,
++                       const RimeInteractionSnapshot* snapshot);
++int HighlightItem(SessionId session_id,
++                  RimeInteractionSnapshot* snapshot,
++                  uint32_t item_id);
++int SelectItem(SessionId session_id,
++               RimeInteractionSnapshot* snapshot,
++               uint32_t item_id);
++const char* GetItemStyle(const RimeInteractionSnapshot* snapshot, uint32_t item_id);
++int SetLayout(SessionId session_id, const RimeInteractionSnapshot* snapshot,
++              uint64_t frame_token, uint64_t layout_revision,
++              const RimeInteractionRect* rectangles, int rectangle_count);
++int NeighborItem(SessionId session_id, const RimeInteractionSnapshot* snapshot,
++                 uint32_t item_id, int direction, uint32_t* target_id);
++void ClearLayout(SessionId session_id);
++RimeInteractionPreedit* GetPreeditPresentation(SessionId session_id);
++void FreePreeditPresentation(RimeInteractionPreedit* preedit);
++void ForgetSession(SessionId session_id);
++void ResetSnapshotState();
++
++}  // namespace interaction
++}  // namespace rime
++
++#endif  // RIME_INTERACTION_SNAPSHOT_H_
+diff --git a/src/rime/segmentation.cc b/src/rime/segmentation.cc
+index b34256d05885a22ea80ccd4c639fb6f300408c1d..63186d5c64bc7dccf5fbd1cdf62bf0d768668b78 100644
+--- a/src/rime/segmentation.cc
++++ b/src/rime/segmentation.cc
+@@ -49,6 +49,8 @@ an<Candidate> Segment::GetCandidateAt(size_t index) const {
+ }
+ 
+ an<Candidate> Segment::GetSelectedCandidate() const {
++  if (alternate_candidate)
++    return alternate_candidate;
+   return GetCandidateAt(selected_index);
+ }
+ 
+diff --git a/src/rime/segmentation.h b/src/rime/segmentation.h
+index d385867a02c0eac909449a677ddcd9a67107f7e4..2f2be5080abad134f3f61282ba78a69e2b8d3b85 100644
+--- a/src/rime/segmentation.h
++++ b/src/rime/segmentation.h
+@@ -30,18 +30,29 @@ struct Segment {
+   an<Menu> menu;
+   size_t selected_index = 0;
+   string prompt;
++  // Rod/item payload currently highlighted or selected. The menu index stays
++  // the mount/anchor. Not inserted into the main candidate page.
++  an<Candidate> alternate_candidate;
++  uint32_t alternate_item_id = 0;
+ 
+   Segment() = default;
+ 
+   Segment(int start_pos, int end_pos)
+       : start(start_pos), end(end_pos), length(end_pos - start_pos) {}
+ 
++  void ClearAlternate() {
++    alternate_candidate.reset();
++    alternate_item_id = 0;
++  }
++  bool HasAlternate() const { return bool(alternate_candidate); }
++
+   void Clear() {
+     status = kVoid;
+     tags.clear();
+     menu.reset();
+     selected_index = 0;
+     prompt.clear();
++    ClearAlternate();
+   }
+ 
+   void Close();
+diff --git a/src/rime/service.cc b/src/rime/service.cc
+index e40493ae921675bd9b28b1966b3c52147048ec02..a6f5f4cba8ad6851b96053f52c080ca7bf4e2e36 100644
+--- a/src/rime/service.cc
++++ b/src/rime/service.cc
+@@ -6,6 +6,7 @@
+ //
+ #include <rime/context.h>
+ #include <rime/engine.h>
++#include <rime/interaction/snapshot.h>
+ #include <rime/resource.h>
+ #include <rime/schema.h>
+ #include <rime/service.h>
+@@ -117,10 +118,22 @@ an<Session> Service::GetSession(SessionId session_id) {
+   return nullptr;
+ }
+ 
++SessionId Service::FindSessionByContext(Context* ctx) {
++  if (!ctx || disabled())
++    return kInvalidSessionId;
++  std::lock_guard<std::mutex> lock(mutex_);
++  for (const auto& kv : sessions_) {
++    if (kv.second && kv.second->context() == ctx)
++      return kv.first;
++  }
++  return kInvalidSessionId;
++}
++
+ bool Service::DestroySession(SessionId session_id) {
+   auto it = sessions_.find(session_id);
+   if (it == sessions_.end())
+     return false;
++  interaction::ForgetSession(session_id);
+   sessions_.erase(it);
+   return true;
+ }
+@@ -131,6 +144,7 @@ void Service::CleanupStaleSessions() {
+   for (auto it = sessions_.begin(); it != sessions_.end();) {
+     if (it->second &&
+         it->second->last_active_time() < now - Session::kLifeSpan) {
++      interaction::ForgetSession(it->first);
+       sessions_.erase(it++);
+       ++count;
+     } else {
+@@ -143,6 +157,8 @@ void Service::CleanupStaleSessions() {
+ }
+ 
+ void Service::CleanupAllSessions() {
++  for (const auto& kv : sessions_)
++    interaction::ForgetSession(kv.first);
+   sessions_.clear();
+ }
+ 
+diff --git a/src/rime/service.h b/src/rime/service.h
+index a69ae74144d4ae2765587757bdf9b143e8ba7788..2b87f2ceee11baa004e1ec67ea08cd89f8120ecf 100644
+--- a/src/rime/service.h
++++ b/src/rime/service.h
+@@ -65,6 +65,7 @@ class RIME_DLL Service {
+ 
+   SessionId CreateSession();
+   an<Session> GetSession(SessionId session_id);
++  SessionId FindSessionByContext(Context* ctx);
+   bool DestroySession(SessionId session_id);
+   void CleanupStaleSessions();
+   void CleanupAllSessions();
+diff --git a/src/rime/setup.cc b/src/rime/setup.cc
+index 4c2a73b9c1da6320f30c7affa819503d5396312a..c8867baac3457bddfd7209d74f83e8bbcf46471d 100644
+--- a/src/rime/setup.cc
++++ b/src/rime/setup.cc
+@@ -27,7 +27,7 @@ RIME_DLL RIME_MODULE_LIST(kDefaultModules, "default" RIME_EXTRA_MODULES);
+ RIME_DLL RIME_MODULE_LIST(kDeployerModules, "deployer");
+ RIME_MODULE_LIST(kLegacyModules, "legacy");
+ 
+-RIME_REGISTER_MODULE_GROUP(default, "core", "dict", "gears")
++RIME_REGISTER_MODULE_GROUP(default, "core", "dict", "gears", "interaction")
+ RIME_REGISTER_MODULE_GROUP(deployer, "core", "dict", "levers")
+ 
+ RIME_DLL void LoadModules(const char* module_names[]) {
+diff --git a/src/rime_interaction_api.h b/src/rime_interaction_api.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f32eedc063c20537a1cea4a816500cef721473e0
+--- /dev/null
++++ b/src/rime_interaction_api.h
+@@ -0,0 +1,172 @@
++/*
++ * Copyright RIME Developers
++ * Distributed under the BSD License
++ *
++ * Interaction snapshot extension API (rod data chain, v2).
++ * Obtained via RimeFindModule("interaction")->get_api().
++ * This header does not add members to RimeApi.
++ */
++#ifndef RIME_INTERACTION_API_H_
++#define RIME_INTERACTION_API_H_
++
++#include "rime_api.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define RIME_INTERACTION_API_VERSION 2
++
++enum RimeInteractionStatus {
++  kRimeInteractionInvalid = 0,
++  kRimeInteractionOk = 1,
++  kRimeInteractionExpired = 2,
++  kRimeInteractionNotOutput = 3
++};
++
++/* Item kind. C++ enum rime::interaction::ItemKind uses the same values. */
++enum RimeInteractionKind {
++  kRimeInteractionKindNone = 0,
++  kRimeInteractionKindSource = 1,      /* source, Lua kind "source" */
++  kRimeInteractionKindAssociated = 2,  /* associated, Lua kind "associated" */
++  kRimeInteractionKindNotice = 3,      /* rod notice, Lua kind "notice", not committable */
++  kRimeInteractionKindOutput = 4       /* committable output, Lua kind "output"; also plain items */
++};
++
++/*
++ * Snapshot item. Public id is a positive integer local to this snapshot.
++ * 0 in source_id / attached_to_id means "none".
++ *
++ * C++ / Lua correspondence:
++ *   id            <- assigned at export; not a pointer
++ *   source_id     <- InteractionCandidate::source()
++ *   attached_to_id<- rod parent
++ *   kind          <- ItemKind / opts.kind
++ *   label         <- InteractionCandidate::label() or Candidate::text()
++ *   comment       <- display comment metadata
++ *   text          <- Candidate::text() of the real payload (empty for notice)
++ *   action        <- "commit" or "notice"
++ *   start, end    <- UTF-8 byte range in current input
++ *   menu_index    <- index in prepared main menu, -1 if not on the page
++ *   rod_id        <- 0 if not a rod row; else the rod identity, derived
++ *                    from the mounted item's snapshot id (one rod per item)
++ *   rod_index     <- row order inside that rod, not an identity
++ *   hint          <- optional display-only prefix for a rod row; never payload
++ */
++typedef struct rime_interaction_item_t {
++  uint32_t id;
++  uint32_t source_id;
++  uint32_t attached_to_id;
++  int kind;
++  char* label;
++  char* comment;
++  char* text;
++  char* action;
++  int start;
++  int end;
++  int menu_index;
++  uint32_t rod_id;
++  int rod_index;
++  char* hint;
++} RimeInteractionItem;
++
++/*
++ * Versioned snapshot. Strings and items are valid until free_snapshot.
++ * generation changes when activatable content, input coverage, input text,
++ * or schema changes. Highlight / hover does not change generation or ids.
++ */
++typedef struct rime_interaction_snapshot_t {
++  int data_size;
++  int api_version;
++  uint32_t generation;
++  RimeSessionId session_id;
++  char* schema_id;
++  char* input;
++  int item_count;
++  RimeInteractionItem* items;
++  /* currently highlighted/selected item id; 0 if none. highlight does not
++   * change generation. */
++  uint32_t active_item_id;
++} RimeInteractionSnapshot;
++
++/* Optional v2 tail: final client-coordinate rectangles, never guessed by Lua.
++ * A layout belongs to one snapshot generation and an opaque frontend frame.
++ * No key bindings or default navigation policy are installed by this API. */
++typedef struct rime_interaction_rect_t {
++  uint32_t item_id;
++  int left;
++  int top;
++  int right;
++  int bottom;
++} RimeInteractionRect;
++
++enum RimeInteractionDirection {
++  kRimeInteractionLeft = 1,
++  kRimeInteractionRight = 2,
++  kRimeInteractionUp = 3,
++  kRimeInteractionDown = 4
++};
++
++/* UTF-8 display ranges. Text is the exact GetPreedit() presentation, including
++ * soft cursor/prompt. False highlightable keeps controls/Tips out of selection. */
++typedef struct rime_interaction_text_span_t {
++  int start;
++  int end;
++  char* style_key;
++  Bool highlightable;
++} RimeInteractionTextSpan;
++typedef struct rime_interaction_preedit_t {
++  int data_size;
++  char* text;
++  int span_count;
++  RimeInteractionTextSpan* spans;
++} RimeInteractionPreedit;
++
++typedef struct rime_interaction_api_t {
++  int data_size;
++  int api_version;
++
++  /* Caller owns the result and must call free_snapshot. NULL on failure. */
++  RimeInteractionSnapshot* (*get_snapshot)(RimeSessionId session_id);
++  void (*free_snapshot)(RimeInteractionSnapshot* snapshot);
++
++  /* True if session still has the same generation as this snapshot. */
++  Bool (*snapshot_is_current)(RimeSessionId session_id,
++                              const RimeInteractionSnapshot* snapshot);
++
++  /* Highlight or select by snapshot item id. Returns RimeInteractionStatus.
++   * Only kRimeInteractionOk means the action was taken. Notice items return
++   * kRimeInteractionNotOutput. Freed or foreign snapshots are invalid. */
++  int (*highlight_item)(RimeSessionId session_id,
++                        RimeInteractionSnapshot* snapshot,
++                        uint32_t item_id);
++  int (*select_item)(RimeSessionId session_id,
++                     RimeInteractionSnapshot* snapshot,
++                     uint32_t item_id);
++
++  /* Appended, size-checked facilities. The v2 item array ABI stays unchanged.
++   * Returned style key is snapshot-owned; empty/NULL means inherited style. */
++  const char* (*get_item_style)(const RimeInteractionSnapshot* snapshot,
++                                uint32_t item_id);
++  int (*set_layout)(RimeSessionId session_id,
++                     const RimeInteractionSnapshot* snapshot,
++                     uint64_t frame_token,
++                     uint64_t layout_revision,
++                     const RimeInteractionRect* rectangles,
++                     int rectangle_count);
++  /* Ok + target_id=0 means a wall. Expired means no current measured layout. */
++  int (*neighbor_item)(RimeSessionId session_id,
++                        const RimeInteractionSnapshot* snapshot,
++                        uint32_t item_id,
++                        int direction,
++                        uint32_t* target_id);
++  void (*clear_layout)(RimeSessionId session_id);
++  RimeInteractionPreedit* (*get_preedit)(RimeSessionId session_id);
++  void (*free_preedit)(RimeInteractionPreedit* preedit);
++} RimeInteractionApi;
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif  /* RIME_INTERACTION_API_H_ */

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "source_preview": true,
+  "installer_ready": false,
+  "offline_payload_ready": false,
+  "native_clean_build_verified": false,
+  "public_schema_dependency_closure": false
+}

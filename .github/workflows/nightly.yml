@@ -1,0 +1,23 @@
+name: Nightly
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+      timezone: Asia/Shanghai
+permissions:
+  contents: read
+concurrency:
+  group: vf-rime-nightly
+  cancel-in-progress: false
+jobs:
+  source-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify reviewed source export
+        run: python3 build/verify_source_preview.py
+      - name: State current build stage
+        run: |
+          echo "Source preview checked. Installer/native publication is not yet ready."
+          echo "No Actions artifact upload, Packages, LFS or paid runner is used."

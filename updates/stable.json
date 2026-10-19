@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "channel": "stable",
+  "available": false,
+  "reason": "首次完整安装器尚在开发，没有可供安装的发行版本。"
+}

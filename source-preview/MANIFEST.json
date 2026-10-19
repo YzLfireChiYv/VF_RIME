@@ -1,0 +1,220 @@
+{
+  "format": 1,
+  "files": [
+    {
+      "path": "BUILDING.md",
+      "bytes": 2094,
+      "sha256": "765248000ff873292c7c9541855330cb2b13ee32535eb6c62c22ca95099137b0"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 1010,
+      "sha256": "c1207eabb6dfb2cac28b7a1ffe6a86003e53bc5347a3434ae869940a3f2ded92"
+    },
+    {
+      "path": "examples/association_demo/association_demo.schema.yaml",
+      "bytes": 702,
+      "sha256": "06cccc496b2f60f23af76e467991c029d0c5b4f070ec3709e49e72388defaf0b"
+    },
+    {
+      "path": "examples/association_demo/lua/association_demo.lua",
+      "bytes": 4067,
+      "sha256": "3180bcf741b83254a4251291915a996965b5f21bfe815cf3136989b5ecab7cd7"
+    },
+    {
+      "path": "examples/association_demo/README.md",
+      "bytes": 3148,
+      "sha256": "893bad9b7995fda33b715690885cc7b1e4127af3ee35112acefd1f78367e2f22"
+    },
+    {
+      "path": "examples/association_demo/VERIFIED.json",
+      "bytes": 524,
+      "sha256": "d9c0b5aebae8ce7635e328c2a1e4f64f9af7508afd994d59a1e5b0f737595e93"
+    },
+    {
+      "path": "framework/lua/zhvjia/association_plan.lua",
+      "bytes": 7631,
+      "sha256": "e4659c0b1fe0d2ef43a5851e56e7084fcabaf1c7e24ff0ec7282a54e19f5e0f6"
+    },
+    {
+      "path": "framework/lua/zhvjia/auxiliary.lua",
+      "bytes": 8582,
+      "sha256": "1f793db213a3d459c95e892ab428aea3fbba7134647421e4d13cd4810c931c89"
+    },
+    {
+      "path": "framework/lua/zhvjia/breakpoints.lua",
+      "bytes": 3800,
+      "sha256": "43fc6e64eb428bd59035ab7c2c8e88f175e68ad2ddd6a829c876cdeb942bf73b"
+    },
+    {
+      "path": "framework/lua/zhvjia/calculator_mode.lua",
+      "bytes": 11970,
+      "sha256": "aa1074f8643d1077080fa50760cfd2857380364feb5cf0ec0297db85cac19da6"
+    },
+    {
+      "path": "framework/lua/zhvjia/catalog_mode.lua",
+      "bytes": 9733,
+      "sha256": "8add88596e68a2eb4237c98b83a4e2db179a730f94c0d0d9139844ba30845528"
+    },
+    {
+      "path": "framework/lua/zhvjia/code_mode.lua",
+      "bytes": 16392,
+      "sha256": "43d36e36437c8175042a407cde5408fb1d16d68c4c058e088f2fa77a10be8c66"
+    },
+    {
+      "path": "framework/lua/zhvjia/config.lua",
+      "bytes": 17940,
+      "sha256": "09dd2443335b2d58ff4bc06b523991946c57d1b9120a05ba522da8b46df6595d"
+    },
+    {
+      "path": "framework/lua/zhvjia/content.lua",
+      "bytes": 11419,
+      "sha256": "9c51bf4cdc328b701f223494f8811bf9fc26aded4e14a3493afabebeb83458b1"
+    },
+    {
+      "path": "framework/lua/zhvjia/control.lua",
+      "bytes": 22055,
+      "sha256": "162dd041550851a2ad2cb4761254386a0dbadc6c6fdfd9c789f3a82b4e2ea1f3"
+    },
+    {
+      "path": "framework/lua/zhvjia/creation.lua",
+      "bytes": 16113,
+      "sha256": "116f0e213e9be5c909b5f04cc5172b3115b3fef3918c4d5d0d76e031e450c696"
+    },
+    {
+      "path": "framework/lua/zhvjia/gloss_associations.lua",
+      "bytes": 2343,
+      "sha256": "c2911898cbcc140ccbbd436e7230ebbc26fcfdc47da249214b3561311cc8945a"
+    },
+    {
+      "path": "framework/lua/zhvjia/literal_editor.lua",
+      "bytes": 1457,
+      "sha256": "c9080b9bc8bcacdb84d5d30e13b5316ffeaa1e29882b2e4ce283f04c758c7e2b"
+    },
+    {
+      "path": "framework/lua/zhvjia/modes.lua",
+      "bytes": 3790,
+      "sha256": "73bb4fee8c0dacf889c4e31a3d9793f245c721368ec94c27b593567ce2bf53fd"
+    },
+    {
+      "path": "framework/lua/zhvjia/pipeline.lua",
+      "bytes": 8926,
+      "sha256": "bf77f00e1b685fa1c138719c7dd8a661fd1ba84a45e427d1d1304eea4b75312c"
+    },
+    {
+      "path": "framework/lua/zhvjia/presentation.lua",
+      "bytes": 15303,
+      "sha256": "a6c00c78df45080e505e4da572dd536cd4a0d238cafd057dea587a5fd31327ee"
+    },
+    {
+      "path": "framework/lua/zhvjia/primary.lua",
+      "bytes": 11434,
+      "sha256": "8de0c8b76571dd69cd29d18b4fa2d61ec786072a077a76702aac197234bdd0f5"
+    },
+    {
+      "path": "framework/lua/zhvjia/runtime.lua",
+      "bytes": 2166,
+      "sha256": "d9a758d71b1db461b2a7a28132921d4de8c10c0d01d88702b98b7896c51ff12d"
+    },
+    {
+      "path": "framework/lua/zhvjia/source_uniquify.lua",
+      "bytes": 2363,
+      "sha256": "6af563902f106baf17c6ddc9fd90b917bd39b74462872aa29201faa54d251acc"
+    },
+    {
+      "path": "framework/ORIGINS.json",
+      "bytes": 6851,
+      "sha256": "073d174fbbb4dc0e30df78261edc73dc12e5b0b4f7d642c6186d45549af32c2b"
+    },
+    {
+      "path": "framework/README.md",
+      "bytes": 1001,
+      "sha256": "5fb10c30a5d0bf6b0ffd4d5f885ca930ede1156f42f43139ff718e012158f3c8"
+    },
+    {
+      "path": "KNOWN-LIMITATIONS.md",
+      "bytes": 1220,
+      "sha256": "f818208faedaee1b1ef72d77fb90f6a790caae8c85a621e9ea79586ffca76850"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1240,
+      "sha256": "a7271cf4a27f86f13b9386bbcc20a9550cd1538d6d9f0e1834ecfa4152dce417"
+    },
+    {
+      "path": "LICENSE-MAP.json",
+      "bytes": 654,
+      "sha256": "2be0b326ccc2ae91076ad49f8915ab07b177b81cd1e9c118ee13ad75c4230bac"
+    },
+    {
+      "path": "LICENSES/librime-lua.txt",
+      "bytes": 1550,
+      "sha256": "4b42fa25f39c94b16588a2970a429c4d11a975ab32ac28f91cc823e836511a38"
+    },
+    {
+      "path": "LICENSES/librime.txt",
+      "bytes": 1543,
+      "sha256": "44c39955377bb15d825f8142de500ed832309178ce34624c5d1a1f00761bb1ee"
+    },
+    {
+      "path": "LICENSES/MIT.txt",
+      "bytes": 1090,
+      "sha256": "989d9b7f8000ff0ad638ac391d8a9d4db584278a512722f4115b5730bd3748b8"
+    },
+    {
+      "path": "LICENSES/weasel.txt",
+      "bytes": 35821,
+      "sha256": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b"
+    },
+    {
+      "path": "patches/librime-lua.patch",
+      "bytes": 25769,
+      "sha256": "ca5f05adef84179f92b0afc60c01dfbc10a29d2da09c3796e377dcd0b422902b"
+    },
+    {
+      "path": "patches/librime.patch",
+      "bytes": 99309,
+      "sha256": "c4c765f773c82e346cefc9471a8641b97faa54a7ac1ee9751d967f2ae71b220a"
+    },
+    {
+      "path": "patches/weasel.patch",
+      "bytes": 295330,
+      "sha256": "37f920b49c4f10a9ffe324005af7e26fd3a0c079ef6e9d3748459d47a848531b"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1265,
+      "sha256": "08fe36fbff75a79f506c7c3fa50ba68086eb7051a5ba4e046ab46cd186c92fad"
+    },
+    {
+      "path": "RESOURCE-SOURCES.json",
+      "bytes": 1605,
+      "sha256": "da1c976452df5de7093716405992f7353456b60e64db50e13c6e048c10d3bf01"
+    },
+    {
+      "path": "RESOURCE-SOURCES.md",
+      "bytes": 751,
+      "sha256": "df2a10afac7eda1f39900887dd03bfd9750f6415a019d679acc0e56c423bcd23"
+    },
+    {
+      "path": "SOURCE-LOCK.json",
+      "bytes": 2787,
+      "sha256": "851f3ba73dc784af201e2b3f11451e5a5108055ef89b0f4ce383d8b0a8711320"
+    },
+    {
+      "path": "THIRD-PARTY.md",
+      "bytes": 1612,
+      "sha256": "a955dcabc886b1a53cc3a1ed9e14bffc262acc1e5511b80e2ca6504f770e1864"
+    },
+    {
+      "path": "tools/prepare_sources.py",
+      "bytes": 2935,
+      "sha256": "7ddd8a7291436b3b7f612c754638ddb3f556320df79c45be7baf473a85eccd69"
+    },
+    {
+      "path": "VERIFICATION.json",
+      "bytes": 941,
+      "sha256": "5c77b17d22bd32bf9798fec7c134fa3778f782505c37694fc83893e187e821af"
+    }
+  ]
+}

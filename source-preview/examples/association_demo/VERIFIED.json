@@ -1,0 +1,21 @@
+{
+  "scope": "isolated synthetic API checks, no live user directory",
+  "checks": [
+    {
+      "name": "native source/associated/two rods and stored time selection",
+      "passed": true
+    },
+    {
+      "name": "English direct preset and selected associated first rod",
+      "passed": true
+    },
+    {
+      "name": "association_demo_flat native digit selection",
+      "passed": true
+    },
+    {
+      "name": "association_demo_fallback native digit selection",
+      "passed": true
+    }
+  ]
+}

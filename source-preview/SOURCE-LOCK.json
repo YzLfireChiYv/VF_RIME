@@ -1,0 +1,71 @@
+{
+  "format": 1,
+  "status": "local_source_review_candidate",
+  "repositories": [
+    {
+      "id": "weasel",
+      "upstream": "https://github.com/rime/weasel.git",
+      "base_ref": "0.17.4",
+      "base_commit": "9cc96e20dc71b80876b12f689bb5863c76c2a7ed",
+      "local_patched_head": "b6c60449386ab4e1c7b77ae8014d161a7345b36f",
+      "patched_tree": "d712aa9673e4e96f2e97071db06197585acc0b8c",
+      "checkout_path": "weasel",
+      "patch": "patches/weasel.patch",
+      "patch_sha256": "37f920b49c4f10a9ffe324005af7e26fd3a0c079ef6e9d3748459d47a848531b",
+      "license": "GPLv3 as upstream"
+    },
+    {
+      "id": "librime",
+      "upstream": "https://github.com/rime/librime.git",
+      "base_ref": "1.13.1",
+      "base_commit": "1c23358157934bd6e6d6981f0c0164f05393b497",
+      "local_patched_head": "6ab5f16169081e92592144749780e8b471f286b7",
+      "patched_tree": "47e71533b4dfba1aec74483caa6f590597394ecc",
+      "checkout_path": "weasel/librime",
+      "patch": "patches/librime.patch",
+      "patch_sha256": "c4c765f773c82e346cefc9471a8641b97faa54a7ac1ee9751d967f2ae71b220a",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "id": "librime-lua",
+      "upstream": "https://github.com/hchunhui/librime-lua.git",
+      "base_ref": "ec52e48ea18f11af37717a01c337f853215cf70b",
+      "base_commit": "ec52e48ea18f11af37717a01c337f853215cf70b",
+      "local_patched_head": "ec09507f3efe22b09af3e51f4d33726e163dcf30",
+      "patched_tree": "c0a4f79657cd6151e3475b0b0a0d8c9c32ded1f5",
+      "checkout_path": "weasel/librime/plugins/lua",
+      "patch": "patches/librime-lua.patch",
+      "patch_sha256": "ca5f05adef84179f92b0afc60c01dfbc10a29d2da09c3796e377dcd0b422902b",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "id": "octagram",
+      "upstream": "https://github.com/lotem/librime-octagram.git",
+      "base_commit": "bfb168ca33d8b372596fdf2007933f3da1cf360e",
+      "checkout_path": "weasel/librime/plugins/octagram",
+      "license": "BSD-3-Clause",
+      "patch": null
+    },
+    {
+      "id": "predict",
+      "upstream": "https://github.com/rime/librime-predict.git",
+      "base_commit": "920bd41ebf6f9bf6855d14fbe80212e54e749791",
+      "checkout_path": "weasel/librime/plugins/predict",
+      "license": "BSD-3-Clause",
+      "patch": null
+    }
+  ],
+  "framework_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+  "native_combination": {
+    "client_protocol": 3,
+    "ui_style_archive": 2,
+    "interaction_c_api": 2
+  },
+  "lua_runtime": {
+    "version": "5.4.8",
+    "url": "https://www.lua.org/ftp/lua-5.4.8.tar.gz",
+    "sha256": "4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae",
+    "checksum_source": "https://www.lua.org/ftp/",
+    "bundled": false
+  }
+}

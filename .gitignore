@@ -1,0 +1,15 @@
+.vs/
+.idea/
+.grok/
+**/bin/
+**/obj/
+.tools/
+.dotnet/
+artifacts/
+sources/
+payloads/
+*.user
+*.suo
+*.pfx
+*.p12
+*.key

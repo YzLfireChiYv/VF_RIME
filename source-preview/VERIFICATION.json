@@ -1,0 +1,36 @@
+{
+  "scope": "local preparation only",
+  "patch_checks": [
+    {
+      "component": "weasel",
+      "patch_applies_to_base": true,
+      "patched_tree_matches": true
+    },
+    {
+      "component": "librime",
+      "patch_applies_to_base": true,
+      "patched_tree_matches": true
+    },
+    {
+      "component": "librime-lua",
+      "patch_applies_to_base": true,
+      "patched_tree_matches": true
+    },
+    {
+      "component": "standalone_demo",
+      "isolated_checks": 4,
+      "passed": true
+    }
+  ],
+  "private_identity_path_hits": 0,
+  "unexpected_links_or_runtime_data": 0,
+  "private_git_history_included": false,
+  "network_fetch_executed": false,
+  "fresh_binary_build_executed": false,
+  "public_push_executed": false,
+  "framework_refresh": {
+    "revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "focused_input_key_checks": 20,
+    "runtime_installation_claimed": false
+  }
+}

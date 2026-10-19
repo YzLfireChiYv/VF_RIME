@@ -1,0 +1,128 @@
+[
+  {
+    "file": "framework/lua/zhvjia/association_plan.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "bf66ebee78db414b00bda4ae30a84608d9c96fbbe04bbe065d24d6299e05c0b7",
+    "export_sha256": "e4659c0b1fe0d2ef43a5851e56e7084fcabaf1c7e24ff0ec7282a54e19f5e0f6",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/auxiliary.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "eb59468dc2b5337eecbde7b0896da05c6bbb8eef8d5a4547ff1f142adcc28db9",
+    "export_sha256": "1f793db213a3d459c95e892ab428aea3fbba7134647421e4d13cd4810c931c89",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/breakpoints.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "0bc8f93148386f6ee37754f6ee7961aa070d794138b650526c252dbed458bc9d",
+    "export_sha256": "43fc6e64eb428bd59035ab7c2c8e88f175e68ad2ddd6a829c876cdeb942bf73b",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/calculator_mode.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "cdf3f0512ff34ea8eb564efdbf5f1bc76e50bc816da2f4a43b0a86df6fc9dbbb",
+    "export_sha256": "aa1074f8643d1077080fa50760cfd2857380364feb5cf0ec0297db85cac19da6",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/catalog_mode.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "0cfcff17101ceba37764ba42c90f36379ed134df5b080263e85bb224ea4a5ee0",
+    "export_sha256": "8add88596e68a2eb4237c98b83a4e2db179a730f94c0d0d9139844ba30845528",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/code_mode.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "4703b104b9df446c78eaaf7fc848a2f1840d19d11cfa083eb04a050342c3899f",
+    "export_sha256": "43d36e36437c8175042a407cde5408fb1d16d68c4c058e088f2fa77a10be8c66",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/config.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "e9c62e37082f23bc82b89fbcfa580f6e1e3b3dc3bef09a8e237b56110fcf7820",
+    "export_sha256": "09dd2443335b2d58ff4bc06b523991946c57d1b9120a05ba522da8b46df6595d",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/content.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "17f94251c0e9613e0b4fc974a5ba22f2f6506359c17a4b9736fdcd4a0a83ed0f",
+    "export_sha256": "9c51bf4cdc328b701f223494f8811bf9fc26aded4e14a3493afabebeb83458b1",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/control.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "6a1614474fc3b34864f0d7f0892a4bbae99618a7f3e8ca31d3ba8bd32c6257bf",
+    "export_sha256": "162dd041550851a2ad2cb4761254386a0dbadc6c6fdfd9c789f3a82b4e2ea1f3",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/creation.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "81d875ecf5de837c4061bfc969a194561a97ffa23e96eff20aa52737eeb6c8ac",
+    "export_sha256": "116f0e213e9be5c909b5f04cc5172b3115b3fef3918c4d5d0d76e031e450c696",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/gloss_associations.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "dc4fca58acbc7a735aa3d2243555276d1e865dfc016fb528b0a2ef9091468012",
+    "export_sha256": "c2911898cbcc140ccbbd436e7230ebbc26fcfdc47da249214b3561311cc8945a",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/literal_editor.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "c7557d169b2941d075951cbd84200666f1254917259eb698c09af07011327bae",
+    "export_sha256": "c9080b9bc8bcacdb84d5d30e13b5316ffeaa1e29882b2e4ce283f04c758c7e2b",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/modes.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "2c500da75b643d4f4ca4f811ba274039bf88d87319730f14801fd66c07d430f9",
+    "export_sha256": "73bb4fee8c0dacf889c4e31a3d9793f245c721368ec94c27b593567ce2bf53fd",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/pipeline.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "e6f11d9ed15ba5b1b6737182af391b71890d4f57b30b4767f3ccfd84d17bf93a",
+    "export_sha256": "bf77f00e1b685fa1c138719c7dd8a661fd1ba84a45e427d1d1304eea4b75312c",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/presentation.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "cbec65d3031c94eba4d29e6509d7839c3c6714deb73afb1bc331236b21e4cc53",
+    "export_sha256": "a6c00c78df45080e505e4da572dd536cd4a0d238cafd057dea587a5fd31327ee",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/primary.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "2cf2dceae1a99cb5a03ab366fd773a83037282e7aab6e68f2a84112d341578c0",
+    "export_sha256": "8de0c8b76571dd69cd29d18b4fa2d61ec786072a077a76702aac197234bdd0f5",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/runtime.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "4f01309afb418a5519b1a68a06538d1e43ecad8b9237750aeef5ba0f847e46be",
+    "export_sha256": "d9a758d71b1db461b2a7a28132921d4de8c10c0d01d88702b98b7896c51ff12d",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  },
+  {
+    "file": "framework/lua/zhvjia/source_uniquify.lua",
+    "source_revision": "78b0f76ccc88fb2266a399d3e25be7e3f2d34a44",
+    "source_sha256": "4dc360b8b8f79f77ea6dfbb9fcbcd7a1e45361c471887ee0224a736d9be5d398",
+    "export_sha256": "6af563902f106baf17c6ddc9fd90b917bd39b74462872aa29201faa54d251acc",
+    "changes": "MIT attribution header added; UTF-8/LF text export"
+  }
+]

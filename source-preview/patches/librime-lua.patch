@@ -1,0 +1,736 @@
+diff --git a/src/types.cc b/src/types.cc
+index 69cf24aa4d88beaf49e790004081c5ffe16269f7..35a1404b170110b1de59506b7acb7d38d013f9ce 100644
+--- a/src/types.cc
++++ b/src/types.cc
+@@ -1,5 +1,7 @@
+ #include <rime_api.h>
+ #include <rime/candidate.h>
++#include <rime/interaction/candidate.h>
++#include <rime/interaction/snapshot.h>
+ #include <rime/translation.h>
+ #include <rime/segmentation.h>
+ #include <rime/menu.h>
+@@ -21,6 +23,9 @@
+ #include "lua_gears.h"
+ #include <boost/regex.hpp>
+ #include <chrono>
++#include <cmath>
++#include <cstring>
++#include <limits>
+ 
+ #include "lib/lua_export_type.h"
+ #include "optional.h"
+@@ -207,6 +212,8 @@ namespace CandidateReg {
+   using T = Candidate;
+ 
+   string dynamic_type(T &c) {
++    if (dynamic_cast<interaction::InteractionCandidate *>(&c))
++      return "Interaction";
+     if (dynamic_cast<Sentence *>(&c))
+       return "Sentence";
+     if (dynamic_cast<Phrase *>(&c))
+@@ -308,6 +315,207 @@ namespace CandidateReg {
+     return false;
+   };
+ 
++  bool is_same(const an<T>& self, const an<T>& other) {
++    // Lua may expose one Candidate through several userdata wrappers.
++    return self.get() == other.get();
++  }
++
++  string lua_opt_string(lua_State* L, int table, const char* key) {
++    lua_getfield(L, table, key);
++    string value;
++    if (lua_isstring(L, -1))
++      value = lua_tostring(L, -1);
++    lua_pop(L, 1);
++    return value;
++  }
++
++  bool valid_style_key(const char* bytes, size_t length) {
++    if (length > 64)
++      return false;
++    for (size_t i = 0; i < length; ++i) {
++      const char ch = bytes[i];
++      if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
++            (ch >= '0' && ch <= '9') || ch == '_' || ch == '.' || ch == '-'))
++        return false;
++    }
++    return true;
++  }
++
++  string lua_opt_style_key(lua_State* L, int table, bool* specified = nullptr) {
++    lua_getfield(L, table, "style_key");
++    const bool present = !lua_isnil(L, -1) && !lua_isnone(L, -1);
++    if (specified)
++      *specified = present;
++    string value;
++    if (present) {
++      if (lua_type(L, -1) != LUA_TSTRING)
++        luaL_error(L, "Interaction: style_key must be a string");
++      size_t length = 0;
++      const char* bytes = lua_tolstring(L, -1, &length);
++      if (length > 64)
++        luaL_error(L, "Interaction: style_key exceeds 64 bytes");
++      if (!valid_style_key(bytes, length))
++        luaL_error(L, "Interaction: style_key allows only ASCII letters, digits, _, . and -");
++      value.assign(bytes, length);
++    }
++    lua_pop(L, 1);
++    return value;
++  }
++
++  an<T> lua_opt_candidate(lua_State* L, int table, const char* key) {
++    lua_getfield(L, table, key);
++    const int candidate_index = lua_gettop(L);
++    an<T> cand;
++    if (!lua_isnil(L, -1) && !lua_isnone(L, -1))
++      cand = LuaType<an<T>>::todata(L, candidate_index);
++    lua_pop(L, 1);
++    return cand;
++  }
++
++  int raw_decorate(lua_State* L) {
++    an<T> cand = LuaType<an<T>>::todata(L, 1);
++    if (!cand)
++      return luaL_error(L, "Interaction.decorate: candidate expected");
++    string kind_name;
++    bool kind_explicit = false;
++    string label;
++    bool label_explicit = false;
++    string comment;
++    bool comment_explicit = false;
++    string style_key;
++    bool style_explicit = false;
++    an<T> source_cand;
++    if (lua_istable(L, 2)) {
++      string specified = lua_opt_string(L, 2, "kind");
++      if (!specified.empty()) {
++        kind_explicit = true;
++        kind_name = specified;
++      }
++      lua_getfield(L, 2, "label");
++      if (!lua_isnil(L, -1) && !lua_isnone(L, -1)) {
++        label_explicit = true;
++        if (lua_isstring(L, -1))
++          label = lua_tostring(L, -1);
++      }
++      lua_pop(L, 1);
++      lua_getfield(L, 2, "comment");
++      if (!lua_isnil(L, -1) && !lua_isnone(L, -1)) {
++        comment_explicit = true;
++        if (lua_isstring(L, -1))
++          comment = lua_tostring(L, -1);
++      }
++      lua_pop(L, 1);
++      style_key = lua_opt_style_key(L, 2, &style_explicit);
++      source_cand = lua_opt_candidate(L, 2, "source");
++    }
++    an<interaction::InteractionCandidate> item =
++        interaction::AsInteraction(cand);
++    const bool existed = bool(item);
++    interaction::ItemKind kind = interaction::ItemKind::kSource;
++    if (existed && !kind_explicit)
++      kind = item->kind();
++    else if (kind_explicit)
++      kind = interaction::KindFromName(kind_name);
++    if (kind != interaction::ItemKind::kSource &&
++        kind != interaction::ItemKind::kAssociated)
++      return luaL_error(L, "Interaction.decorate: kind must be source or associated");
++    if (kind == interaction::ItemKind::kAssociated && !source_cand &&
++        !(item && item->source()))
++      return luaL_error(L, "Interaction.decorate: associated item needs source candidate");
++    if (existed) {
++      if (kind_explicit)
++        item->set_kind(kind);
++      if (label_explicit)
++        item->set_label(label);
++      if (comment_explicit)
++        item->set_display_comment(comment);
++    } else {
++      item = New<interaction::InteractionCandidate>(cand, kind, string(), comment);
++      if (label_explicit)
++        item->set_label(label);
++      if (comment_explicit)
++        item->set_display_comment(comment);
++    }
++    if (style_explicit)
++      item->set_style_key(style_key);
++    if (source_cand) {
++      auto source = interaction::AsInteraction(source_cand);
++      if (!source)
++        return luaL_error(L, "Interaction.decorate: source must be a decorated candidate");
++      if (!item->set_source(source))
++        return luaL_error(L, "Interaction.decorate: source would create a cycle");
++    }
++    an<T> result = existed ? cand : an<T>(item);
++    // A later display decoration must override an outer Shadow's comment,
++    // while retaining that Shadow's actual text, coverage and learning chain.
++    if (existed && cand.get() != item.get() && comment_explicit) {
++      result = New<ShadowCandidate>(cand, cand->type(), string(), comment, false);
++    }
++    LuaType<an<T>>::pushdata(L, result);
++    return 1;
++  }
++
++  int raw_attach(lua_State* L) {
++    an<T> cand = LuaType<an<T>>::todata(L, 1);
++    auto parent = interaction::AsInteraction(cand);
++    if (!parent)
++      return luaL_error(L, "Interaction.attach: parent must be a decorated candidate");
++    if (!lua_istable(L, 2))
++      return luaL_error(L, "Interaction.attach: rod item table expected");
++    lua_Integer n = luaL_len(L, 2);
++    for (lua_Integer i = 1; i <= n; ++i) {
++      lua_rawgeti(L, 2, i);
++      if (!lua_istable(L, -1)) {
++        lua_pop(L, 1);
++        return luaL_error(L, "Interaction.attach: rod item %d must be a table", (int)i);
++      }
++      int row = lua_gettop(L);
++      string kind_name = lua_opt_string(L, row, "kind");
++      auto kind = interaction::KindFromName(kind_name);
++      if (kind != interaction::ItemKind::kNotice &&
++          kind != interaction::ItemKind::kOutput) {
++        lua_pop(L, 1);
++        return luaL_error(L, "Interaction.attach: kind must be notice or output");
++      }
++      interaction::Attachment attachment;
++      attachment.kind = kind;
++      attachment.label = lua_opt_string(L, row, "label");
++      attachment.comment = lua_opt_string(L, row, "comment");
++      attachment.hint = lua_opt_string(L, row, "hint");
++      attachment.style_key = lua_opt_style_key(L, row);
++      attachment.payload = lua_opt_candidate(L, row, "candidate");
++      string text = lua_opt_string(L, row, "text");
++      if (!attachment.payload && kind == interaction::ItemKind::kOutput) {
++        if (text.empty())
++          text = attachment.label;
++        attachment.payload = New<SimpleCandidate>(
++            "interaction_output", parent->start(), parent->end(), text,
++            attachment.comment);
++      }
++      if (kind == interaction::ItemKind::kNotice && attachment.payload)
++        attachment.payload.reset();
++      if (!parent->Attach(std::move(attachment))) {
++        lua_pop(L, 1);
++        return luaL_error(L, "Interaction.attach: cannot hold output payload");
++      }
++      lua_pop(L, 1);
++    }
++    LuaType<an<T>>::pushdata(L, cand);
++    return 1;
++  }
++
++  optional<string> interaction_kind(T &c) {
++    if (auto item = dynamic_cast<interaction::InteractionCandidate *>(&c))
++      return string(interaction::KindName(item->kind()));
++    return {};
++  }
++
++  optional<string> interaction_label(T &c) {
++    if (auto item = dynamic_cast<interaction::InteractionCandidate *>(&c))
++      return item->label();
++    return {};
++  }
++
+   Spans spans(const an<Candidate> &cand) {
+     if (auto phrase = As<Phrase>(Candidate::GetGenuineCandidate(cand))) {
+       return phrase->spans();
+@@ -333,12 +541,15 @@ namespace CandidateReg {
+     { "get_dynamic_type", WRAP(dynamic_type) },
+     { "get_genuine", WRAP(T::GetGenuineCandidate) },
+     { "get_genuines", WRAP(T::GetGenuineCandidates) },
++    { "is_same", WRAP(is_same) },
+     { "to_shadow_candidate", (raw_shadow_candidate) },
+     { "to_uniquified_candidate", (raw_uniquified_candidate) },
+     { "to_phrase", WRAP(candidate_to_<Phrase>)},
+     { "to_sentence", WRAP(candidate_to_<Sentence>)},
+     { "append", WRAP(append)},
+     { "spans", WRAP(spans)},
++    { "decorate", raw_decorate },
++    { "attach", raw_attach },
+     { NULL, NULL },
+   };
+ 
+@@ -351,6 +562,8 @@ namespace CandidateReg {
+     { "text", WRAPMEM(T, text) },
+     { "comment", WRAPMEM(T, comment) },
+     { "preedit", WRAPMEM(T, preedit) },
++    { "interaction_kind", WRAP(interaction_kind) },
++    { "interaction_label", WRAP(interaction_label) },
+     { NULL, NULL },
+   };
+ 
+@@ -795,6 +1008,211 @@ namespace ContextReg {
+     return t.commit_history();
+   }
+ 
++  int raw_input_revision(lua_State* L) {
++    const T& ctx = LuaType<T&>::todata(L, 1);
++    // The generic unsigned-long-long adapter inherits the 32-bit int adapter.
++    // Revisions need the Lua integer path directly to avoid truncating guards.
++    lua_pushinteger(L, static_cast<lua_Integer>(ctx.input_revision()));
++    return 1;
++  }
++
++  int raw_view_revision(lua_State* L) {
++    const T& ctx = LuaType<T&>::todata(L, 1);
++    lua_pushinteger(L, static_cast<lua_Integer>(ctx.view_revision()));
++    return 1;
++  }
++
++  bool read_unsigned_integer(lua_State* L, int index, uint64_t* value) {
++#if LUA_VERSION_NUM >= 503
++    if (!lua_isinteger(L, index))
++      return false;
++#else
++    // Older Lua versions have one numeric type.  Reject numeric strings,
++    // fractions and out-of-range values before invoking their integer cast.
++    if (lua_type(L, index) != LUA_TNUMBER)
++      return false;
++    const lua_Number number = lua_tonumber(L, index);
++    if (!std::isfinite(number) || number < 0 || std::trunc(number) != number ||
++        number >= std::ldexp(lua_Number{1},
++                             std::numeric_limits<lua_Integer>::digits))
++      return false;
++#endif
++    const lua_Integer integer = lua_tointeger(L, index);
++    if (integer < 0)
++      return false;
++    *value = static_cast<uint64_t>(integer);
++    return true;
++  }
++
++  void raw_projection_field(lua_State* L, int table, const char* key) {
++    lua_pushstring(L, key);
++    lua_rawget(L, table);
++  }
++
++  bool read_projection_integer(lua_State* L, const char* key, uint64_t* value) {
++    raw_projection_field(L, 2, key);
++    const bool valid = read_unsigned_integer(L, -1, value);
++    lua_pop(L, 1);
++    return valid;
++  }
++
++  bool read_projection_region(lua_State* L, int table, size_t text_size,
++                              size_t previous_end, PreeditDisplayRegion* region) {
++    uint64_t start = 0, end = 0;
++    raw_projection_field(L, table, "start");
++    const bool valid_start = read_unsigned_integer(L, -1, &start);
++    lua_pop(L, 1);
++    raw_projection_field(L, table, "end");
++    const bool valid_end = read_unsigned_integer(L, -1, &end);
++    lua_pop(L, 1);
++    if (!valid_start || !valid_end || start < previous_end || start >= end ||
++        end > text_size)
++      return false;
++    region->start = static_cast<size_t>(start);
++    region->end = static_cast<size_t>(end);
++
++    raw_projection_field(L, table, "style_key");
++    if (!lua_isnil(L, -1)) {
++      if (lua_type(L, -1) != LUA_TSTRING) {
++        lua_pop(L, 1);
++        return false;
++      }
++      size_t length = 0;
++      const char* bytes = lua_tolstring(L, -1, &length);
++      if (!CandidateReg::valid_style_key(bytes, length)) {
++        lua_pop(L, 1);
++        return false;
++      }
++      region->style_key.assign(bytes, length);
++    }
++    lua_pop(L, 1);
++
++    raw_projection_field(L, table, "highlightable");
++    if (!lua_isnil(L, -1)) {
++      if (lua_type(L, -1) != LUA_TBOOLEAN) {
++        lua_pop(L, 1);
++        return false;
++      }
++      region->highlightable = lua_toboolean(L, -1) != 0;
++    }
++    lua_pop(L, 1);
++    return true;
++  }
++
++  int raw_set_preedit_projection(lua_State* L) {
++    T& ctx = LuaType<T&>::todata(L, 1);
++    constexpr size_t kMaxProjectionBytes = 64 * 1024;
++    // Parse into a local value first.  Malformed or stale projections leave
++    // the currently installed view untouched and return false to the caller.
++    auto rejected = [L]() {
++      lua_pushboolean(L, 0);
++      return 1;
++    };
++    if (!lua_istable(L, 2) || ctx.input().size() > kMaxProjectionBytes)
++      return rejected();
++
++    PreeditProjection projection;
++    uint64_t sel_start = 0;
++    uint64_t sel_end = 0;
++    if (!read_projection_integer(L, "input_revision", &projection.input_revision) ||
++        !read_projection_integer(L, "view_revision", &projection.view_revision) ||
++        !read_projection_integer(L, "sel_start", &sel_start) ||
++        !read_projection_integer(L, "sel_end", &sel_end) ||
++        sel_start > (std::numeric_limits<size_t>::max)() ||
++        sel_end > (std::numeric_limits<size_t>::max)())
++      return rejected();
++    projection.sel_start = static_cast<size_t>(sel_start);
++    projection.sel_end = static_cast<size_t>(sel_end);
++
++    raw_projection_field(L, 2, "text");
++    if (lua_type(L, -1) != LUA_TSTRING) {
++      lua_pop(L, 1);
++      return rejected();
++    }
++    size_t text_size = 0;
++    const char* text = lua_tolstring(L, -1, &text_size);
++    if (text_size > kMaxProjectionBytes || std::memchr(text, 0, text_size)) {
++      lua_pop(L, 1);
++      return rejected();
++    }
++    projection.text.assign(text, text_size);
++    lua_pop(L, 1);
++
++    raw_projection_field(L, 2, "raw_to_display");
++    if (!lua_istable(L, -1)) {
++      lua_pop(L, 1);
++      return rejected();
++    }
++    const size_t map_size = lua_rawlen(L, -1);
++    if (map_size > kMaxProjectionBytes + 1 ||
++        map_size != ctx.input().size() + 1) {
++      lua_pop(L, 1);
++      return rejected();
++    }
++    projection.raw_to_display.reserve(map_size);
++    const int map_table = lua_gettop(L);
++    for (size_t i = 0; i < map_size; ++i) {
++      lua_rawgeti(L, map_table, static_cast<lua_Integer>(i + 1));
++      uint64_t offset = 0;
++      const bool valid = read_unsigned_integer(L, -1, &offset) &&
++                         offset <= (std::numeric_limits<size_t>::max)() &&
++                         offset <= text_size;
++      lua_pop(L, 1);
++      if (!valid) {
++        lua_pop(L, 1);
++        return rejected();
++      }
++      projection.raw_to_display.push_back(static_cast<size_t>(offset));
++    }
++    lua_pop(L, 1);
++    raw_projection_field(L, 2, "regions");
++    if (!lua_isnil(L, -1)) {
++      if (!lua_istable(L, -1)) {
++        lua_pop(L, 1);
++        return rejected();
++      }
++      const int regions_table = lua_gettop(L);
++      const size_t count = lua_rawlen(L, regions_table);
++      if (count > 64) {
++        lua_pop(L, 1);
++        return rejected();
++      }
++      // A dense list only: sparse numeric keys or map fields must not silently
++      // disappear behind rawlen and turn a requested control span into body.
++      lua_pushnil(L);
++      while (lua_next(L, regions_table)) {
++        uint64_t index = 0;
++        const bool valid = read_unsigned_integer(L, -2, &index) &&
++                           index >= 1 && index <= count;
++        lua_pop(L, 1);
++        if (!valid) {
++          lua_pop(L, 2);  // Invalid key and regions table.
++          return rejected();
++        }
++      }
++      projection.regions.reserve(count);
++      size_t previous_end = 0;
++      for (size_t i = 0; i < count; ++i) {
++        lua_rawgeti(L, regions_table, static_cast<lua_Integer>(i + 1));
++        PreeditDisplayRegion region;
++        const bool valid = lua_istable(L, -1) &&
++            read_projection_region(L, lua_gettop(L), text_size,
++                                   previous_end, &region);
++        lua_pop(L, 1);
++        if (!valid) {
++          lua_pop(L, 1);
++          return rejected();
++        }
++        previous_end = region.end;
++        projection.regions.push_back(std::move(region));
++      }
++    }
++    lua_pop(L, 1);
++    // The core verifies UTF-8 boundaries, map ordering, endpoints and revisions.
++    lua_pushboolean(L, ctx.SetPreeditProjection(std::move(projection)));
++    return 1;
++  }
++
+   static const luaL_Reg funcs[] = {
+     { NULL, NULL },
+   };
+@@ -804,6 +1222,10 @@ namespace ContextReg {
+     { "get_commit_text", WRAPMEM(T::GetCommitText) },
+     { "get_script_text", WRAPMEM(T::GetScriptText) },
+     { "get_preedit", WRAPMEM(T::GetPreedit) },
++    { "get_preedit_body", WRAPMEM(T::GetPreeditBody) },
++    { "make_atomic_candidate", WRAPMEM(T::MakeAtomicCandidate) },
++    { "set_preedit_projection", raw_set_preedit_projection },
++    { "clear_preedit_projection", WRAPMEM(T::ClearPreeditProjection) },
+     { "is_composing", WRAPMEM(T::IsComposing) },
+     { "has_menu", WRAPMEM(T::HasMenu) },
+     { "get_selected_candidate", WRAPMEM(T::GetSelectedCandidate) },
+@@ -835,6 +1257,8 @@ namespace ContextReg {
+     { "composition", WRAP(get_composition) },
+     { "input", WRAPMEM(T::input) },
+     { "caret_pos", WRAPMEM(T::caret_pos) },
++    { "input_revision", raw_input_revision },
++    { "view_revision", raw_view_revision },
+     { "commit_notifier", WRAPMEM(T::commit_notifier) },
+     { "select_notifier", WRAPMEM(T::select_notifier) },
+     { "update_notifier", WRAPMEM(T::update_notifier) },
+@@ -2482,6 +2906,223 @@ namespace SwitcherReg {
+   };
+ }
+ 
++namespace InteractionSnapReg {
++  struct LuaSnap {
++    RimeInteractionSnapshot* snap = nullptr;
++    SessionId session_id = 0;
++  };
++
++  const char* kMeta = "rime.InteractionSnapshot";
++
++  LuaSnap* check(lua_State* L, int i) {
++    return static_cast<LuaSnap*>(luaL_checkudata(L, i, kMeta));
++  }
++
++  int gc(lua_State* L) {
++    auto* u = check(L, 1);
++    if (u && u->snap) {
++      interaction::FreeSnapshot(u->snap);
++      u->snap = nullptr;
++    }
++    return 0;
++  }
++
++  int raw_get(lua_State* L) {
++    Engine* e = LuaType<Engine*>::todata(L, 1);
++    if (!e || !e->context())
++      return 0;
++    SessionId sid = Service::instance().FindSessionByContext(e->context());
++    auto* snap = interaction::GetSnapshot(sid);
++    auto* u = static_cast<LuaSnap*>(lua_newuserdata(L, sizeof(LuaSnap)));
++    u->snap = snap;
++    u->session_id = sid;
++    luaL_getmetatable(L, kMeta);
++    lua_setmetatable(L, -2);
++    return 1;
++  }
++
++  int raw_free(lua_State* L) {
++    auto* u = check(L, 1);
++    if (u && u->snap) {
++      interaction::FreeSnapshot(u->snap);
++      u->snap = nullptr;
++    }
++    return 0;
++  }
++
++  bool read_item_id(lua_State* L, int index, uint32_t* id) {
++    if (!lua_isinteger(L, index))
++      return false;
++    const lua_Integer value = lua_tointeger(L, index);
++    if (value <= 0 || static_cast<uint64_t>(value) >
++                          std::numeric_limits<uint32_t>::max())
++      return false;
++    *id = static_cast<uint32_t>(value);
++    return true;
++  }
++
++  int raw_highlight(lua_State* L) {
++    auto* u = check(L, 1);
++    uint32_t id = 0;
++    if (!u || !u->snap || !read_item_id(L, 2, &id)) {
++      lua_pushinteger(L, kRimeInteractionInvalid);
++      return 1;
++    }
++    lua_pushinteger(L, interaction::HighlightItem(u->session_id, u->snap, id));
++    return 1;
++  }
++
++  int raw_select(lua_State* L) {
++    auto* u = check(L, 1);
++    uint32_t id = 0;
++    if (!u || !u->snap || !read_item_id(L, 2, &id)) {
++      lua_pushinteger(L, kRimeInteractionInvalid);
++      return 1;
++    }
++    lua_pushinteger(L, interaction::SelectItem(u->session_id, u->snap, id));
++    return 1;
++  }
++
++  int raw_neighbor(lua_State* L) {
++    auto* u = check(L, 1);
++    uint32_t id = 0;
++    uint32_t target = 0;
++    int status = kRimeInteractionInvalid;
++    int direction = 0;
++    if (lua_type(L, 3) == LUA_TSTRING) {
++      size_t length = 0;
++      const char* value = lua_tolstring(L, 3, &length);
++      if (length == 4 && std::memcmp(value, "left", 4) == 0)
++        direction = kRimeInteractionLeft;
++      else if (length == 5 && std::memcmp(value, "right", 5) == 0)
++        direction = kRimeInteractionRight;
++      else if (length == 2 && std::memcmp(value, "up", 2) == 0)
++        direction = kRimeInteractionUp;
++      else if (length == 4 && std::memcmp(value, "down", 4) == 0)
++        direction = kRimeInteractionDown;
++    }
++    if (u && u->snap && direction && read_item_id(L, 2, &id))
++      status = interaction::NeighborItem(u->session_id, u->snap, id,
++                                         direction, &target);
++    lua_pushinteger(L, status == kRimeInteractionOk ? target : 0);
++    lua_pushinteger(L, status);
++    return 2;
++  }
++
++  int raw_current(lua_State* L) {
++    auto* u = check(L, 1);
++    if (!u || !u->snap) {
++      lua_pushboolean(L, 0);
++      return 1;
++    }
++    lua_pushboolean(L, interaction::SnapshotIsCurrent(u->session_id, u->snap));
++    return 1;
++  }
++
++  int raw_generation(lua_State* L) {
++    auto* u = check(L, 1);
++    lua_pushinteger(L, u && u->snap ? u->snap->generation : 0);
++    return 1;
++  }
++
++  int raw_active(lua_State* L) {
++    auto* u = check(L, 1);
++    lua_pushinteger(L, u && u->snap ? u->snap->active_item_id : 0);
++    return 1;
++  }
++
++  static void push_item(lua_State* L, const RimeInteractionSnapshot* snap,
++                        const RimeInteractionItem& it) {
++    lua_newtable(L);
++    lua_pushinteger(L, it.id);
++    lua_setfield(L, -2, "id");
++    lua_pushinteger(L, it.kind);
++    lua_setfield(L, -2, "kind");
++    lua_pushstring(L, it.label ? it.label : "");
++    lua_setfield(L, -2, "label");
++    lua_pushstring(L, it.hint ? it.hint : "");
++    lua_setfield(L, -2, "hint");
++    const char* style_key = interaction::GetItemStyle(snap, it.id);
++    lua_pushstring(L, style_key ? style_key : "");
++    lua_setfield(L, -2, "style_key");
++    lua_pushstring(L, it.text ? it.text : "");
++    lua_setfield(L, -2, "text");
++    lua_pushstring(L, it.action ? it.action : "");
++    lua_setfield(L, -2, "action");
++    lua_pushinteger(L, it.menu_index);
++    lua_setfield(L, -2, "menu_index");
++    lua_pushinteger(L, it.rod_id);
++    lua_setfield(L, -2, "rod_id");
++    lua_pushinteger(L, it.rod_index);
++    lua_setfield(L, -2, "rod_index");
++    lua_pushinteger(L, it.source_id);
++    lua_setfield(L, -2, "source_id");
++    lua_pushinteger(L, it.attached_to_id);
++    lua_setfield(L, -2, "attached_to_id");
++    lua_pushinteger(L, it.start);
++    lua_setfield(L, -2, "start");
++    lua_pushinteger(L, it.end);
++    lua_setfield(L, -2, "end");
++  }
++
++  int raw_items(lua_State* L) {
++    auto* u = check(L, 1);
++    lua_newtable(L);
++    if (!u || !u->snap || !u->snap->items)
++      return 1;
++    for (int i = 0; i < u->snap->item_count; ++i) {
++      push_item(L, u->snap, u->snap->items[i]);
++      lua_rawseti(L, -2, i + 1);
++    }
++    return 1;
++  }
++
++  int raw_find_id(lua_State* L) {
++    auto* u = check(L, 1);
++    const char* label = luaL_checkstring(L, 2);
++    if (!u || !u->snap || !u->snap->items) {
++      lua_pushinteger(L, 0);
++      return 1;
++    }
++    for (int i = 0; i < u->snap->item_count; ++i) {
++      const char* item_label = u->snap->items[i].label;
++      if (item_label && std::strcmp(item_label, label) == 0) {
++        lua_pushinteger(L, u->snap->items[i].id);
++        return 1;
++      }
++    }
++    lua_pushinteger(L, 0);
++    return 1;
++  }
++
++  void open(lua_State* L) {
++    luaL_newmetatable(L, kMeta);
++    lua_pushcfunction(L, gc);
++    lua_setfield(L, -2, "__gc");
++    lua_newtable(L);
++    lua_pushcfunction(L, raw_highlight);
++    lua_setfield(L, -2, "highlight");
++    lua_pushcfunction(L, raw_select);
++    lua_setfield(L, -2, "select");
++    lua_pushcfunction(L, raw_neighbor);
++    lua_setfield(L, -2, "neighbor");
++    lua_pushcfunction(L, raw_current);
++    lua_setfield(L, -2, "is_current");
++    lua_pushcfunction(L, raw_free);
++    lua_setfield(L, -2, "free");
++    lua_pushcfunction(L, raw_generation);
++    lua_setfield(L, -2, "generation");
++    lua_pushcfunction(L, raw_active);
++    lua_setfield(L, -2, "active_item_id");
++    lua_pushcfunction(L, raw_items);
++    lua_setfield(L, -2, "items");
++    lua_pushcfunction(L, raw_find_id);
++    lua_setfield(L, -2, "find_id");
++    lua_setfield(L, -2, "__index");
++    lua_pop(L, 1);
++  }
++}
++
+ }
+ 
+ void types_ext_init(lua_State *L);
+@@ -2490,6 +3131,15 @@ void opencc_init(lua_State *L);
+ void types_init(lua_State *L) {
+   EXPORT(SegmentReg, L);
+   EXPORT(CandidateReg, L);
++  lua_newtable(L);
++  lua_pushcfunction(L, CandidateReg::raw_decorate);
++  lua_setfield(L, -2, "decorate");
++  lua_pushcfunction(L, CandidateReg::raw_attach);
++  lua_setfield(L, -2, "attach");
++  InteractionSnapReg::open(L);
++  lua_pushcfunction(L, InteractionSnapReg::raw_get);
++  lua_setfield(L, -2, "get_snapshot");
++  lua_setglobal(L, "Interaction");
+   EXPORT(TranslationReg, L);
+   EXPORT(ReverseDbReg, L);
+   EXPORT(SegmentationReg, L);

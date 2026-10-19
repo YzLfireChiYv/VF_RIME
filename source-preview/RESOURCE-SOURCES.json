@@ -1,0 +1,32 @@
+{
+  "bundled": false,
+  "required_for_demo": false,
+  "historical_daily_resource_observation": "2026-10-19",
+  "assets": [
+    {
+      "name": "dicts.zip",
+      "repository": "amzxyz/rime-wanxiang-data",
+      "release_tag": "dict-nightly",
+      "release_url": "https://github.com/amzxyz/rime-wanxiang-data/releases/tag/dict-nightly",
+      "asset_id": 654681107,
+      "asset_updated_at_utc": "2026-10-18T22:57:04Z",
+      "url": "https://github.com/amzxyz/rime-wanxiang-data/releases/download/dict-nightly/dicts.zip",
+      "asset_api_url": "https://api.github.com/repos/amzxyz/rime-wanxiang-data/releases/assets/654681107",
+      "actual_bytes": 29785128,
+      "actual_sha256": "697ed07e8091d3ee04484ef4eab548b2b7257930b1a83ea133269cd4b0a7b330"
+    },
+    {
+      "name": "wanxiang-lts-zh-hans.gram",
+      "repository": "amzxyz/rime-wanxiang-data",
+      "release_tag": "LTS",
+      "release_url": "https://github.com/amzxyz/rime-wanxiang-data/releases/tag/LTS",
+      "asset_id": 650124920,
+      "asset_updated_at_utc": "2026-10-17T09:59:19Z",
+      "url": "https://github.com/amzxyz/rime-wanxiang-data/releases/download/LTS/wanxiang-lts-zh-hans.gram",
+      "asset_api_url": "https://api.github.com/repos/amzxyz/rime-wanxiang-data/releases/assets/650124920",
+      "actual_bytes": 398505004,
+      "actual_sha256": "1849e5e4acbdbfaf41fceeb86b739d5d0c85d574bd8a688562cba1e6beb78488"
+    }
+  ],
+  "note": "Nightly tags are mutable; require the recorded SHA256, never silently substitute a newer file. Data licenses and attribution remain separate from MIT code."
+}
