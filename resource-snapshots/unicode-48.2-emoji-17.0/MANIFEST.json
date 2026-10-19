@@ -1,0 +1,160 @@
+{
+  "schema_version": 1,
+  "kind": "unmodified-official-build-input-snapshot",
+  "license": "Unicode-3.0",
+  "cldr": {
+    "version": "48.2",
+    "commit": "11299982335beb974c1c63c45265184e759c0f41"
+  },
+  "emoji": "17.0",
+  "runtime_mapping_generated": false,
+  "files": [
+    {
+      "path": "unicode-cldr/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/LICENSE",
+      "bytes": 2033,
+      "sha256": "b49d0e9f8ead51ca8b7df6fec89cc3ae6809198b4b9d43c74216da0118f23f5b",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/README.md",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/README.md",
+      "bytes": 3168,
+      "sha256": "9cbe27bd39f3c6d66d0cb22e6af930e265e0855872b9a7edb2427b86397ad8cc",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotations/root.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotations/root.xml",
+      "bytes": 206681,
+      "sha256": "d1e35f691849eb825cd0bf7718eac672a9d15840d0150f7d876f5bee17d180af",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotations/zh.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotations/zh.xml",
+      "bytes": 291028,
+      "sha256": "92389f71659998736530c72d4dcc86e453fe0be170cde5c5ad27094cab2a2de8",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotations/zh_Hant.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotations/zh_Hant.xml",
+      "bytes": 260276,
+      "sha256": "1aa9491be56437a69b1b9833dc84ec65a38fcce093810bf60ed64f179e5dfcd9",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotations/zh_Hant_HK.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotations/zh_Hant_HK.xml",
+      "bytes": 302707,
+      "sha256": "114c6ded42a386913117885b895624fa17fb469a25bbfbfa5b92916cc71bae80",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotationsDerived/root.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotationsDerived/root.xml",
+      "bytes": 694,
+      "sha256": "7cc162347325c4235d987282b14898c8ca15db820bab4676cf3e181d2320ea23",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotationsDerived/zh.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotationsDerived/zh.xml",
+      "bytes": 502514,
+      "sha256": "777acebb7c4ed103c34f5605881a2537656e0a17d9d1127518da7cd54f612bcc",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotationsDerived/zh_Hant.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotationsDerived/zh_Hant.xml",
+      "bytes": 458556,
+      "sha256": "501e3ac6e138122f4a27d22bf85fdac3f6da590ee12a5c738f6651babaf502c6",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/annotationsDerived/zh_Hant_HK.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/annotationsDerived/zh_Hant_HK.xml",
+      "bytes": 480089,
+      "sha256": "7513381efa897aa5ae46305cc6043390e39efc76714128ea1bcd312a6f06b9e5",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/main/root.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/main/root.xml",
+      "bytes": 290870,
+      "sha256": "f69ab139130793ab721b6d1be8c1385b9a051e0b7c5893615533bcfa7bab0448",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/supplemental/likelySubtags.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/supplemental/likelySubtags.xml",
+      "bytes": 919361,
+      "sha256": "b0049bc6420715b1e3010f43d95745dca227c5aa60357d1d89a1bdcb06287312",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/supplemental/supplementalData.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/supplemental/supplementalData.xml",
+      "bytes": 399983,
+      "sha256": "cd2af39aef82fdbfba4d591c87548203350538ad2318486d104b3b38b8d62f1a",
+      "modified": false
+    },
+    {
+      "path": "unicode-cldr/common/supplemental/supplementalMetadata.xml",
+      "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/supplemental/supplementalMetadata.xml",
+      "bytes": 180141,
+      "sha256": "36e807ce72b15304dd993f132216f408351be1c4376edaa2fe9e9547e2efcac1",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/LICENSE",
+      "source_url": "https://www.unicode.org/license.txt",
+      "bytes": 1995,
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/ReadMe.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/emoji/ReadMe.txt",
+      "bytes": 592,
+      "sha256": "a9dfb891434df76790ca9eda82f4114bdba21f82dd4cd5ede1b41452dc37aa84",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/emoji-data.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt",
+      "bytes": 107324,
+      "sha256": "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/emoji-sequences.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/emoji/emoji-sequences.txt",
+      "bytes": 194868,
+      "sha256": "12cc8267dc33cbd11ed32bcf6fc5dc2ad9c7a77bae1bdfba2f41b1b9b3ead8dd",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/emoji-test.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
+      "bytes": 669326,
+      "sha256": "1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/emoji-variation-sequences.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-variation-sequences.txt",
+      "bytes": 38315,
+      "sha256": "bb3d09ef03f206012c7532dd52dc0a21c9efddba0135ea4cf0d9201b8b9bba7e",
+      "modified": false
+    },
+    {
+      "path": "unicode-emoji/emoji-zwj-sequences.txt",
+      "source_url": "https://www.unicode.org/Public/17.0.0/emoji/emoji-zwj-sequences.txt",
+      "bytes": 277215,
+      "sha256": "5b25441daed2322b068c5e70cda522946a4f0274df864445a1965a92e5fc5cad",
+      "modified": false
+    }
+  ]
+}

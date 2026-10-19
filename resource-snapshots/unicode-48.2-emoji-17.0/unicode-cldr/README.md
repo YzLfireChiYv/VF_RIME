@@ -1,0 +1,52 @@
+# Unicode CLDR Project
+
+For current CLDR release information, see [cldr.unicode.org](https://cldr.unicode.org/index/downloads/).
+
+## `main` branch
+
+[![cldr-mvn](https://github.com/unicode-org/cldr/workflows/cldr-mvn/badge.svg)](https://github.com/unicode-org/cldr/actions?query=branch%3Amain+workflow%3A%22cldr-mvn%22)
+[![Publish to gh-pages](https://github.com/unicode-org/cldr/actions/workflows/gh-pages.yml/badge.svg)](https://github.com/unicode-org/cldr/actions/workflows/gh-pages.yml)
+[![CodeQL](https://github.com/unicode-org/cldr/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/unicode-org/cldr/actions/workflows/codeql-analysis.yml)
+
+## Status
+
+Update: 2026-03-16
+
+<!-- [inapplicable lines are commented out.]-->
+<!-- **Note:**  CLDR 48.2 is in development and not recommended for use at this stage. -->
+<!--**Note:**  This is the milestone 1 version of CLDR 48.2, intended for those wishing to do pre-release testing. It is not recommended for production use.-->
+<!--**Note:** This is a preliminary version of CLDR 48.2, intended for those wishing to do pre-release testing. It is not recommended for production use.-->
+<!--**Note:**  This is a pre-release candidate version of CLDR 48.2, intended for testing. It is not recommended for production use.-->
+This is the final release version of CLDR 48.2.
+
+### What is CLDR?
+
+The Unicode Common Locale Data Repository (CLDR) provides key building blocks for software to support the world's languages, with the largest and most extensive standard repository of locale data available. This data is used by a [wide spectrum of companies](https://cldr.unicode.org/#who-uses-cldr) for their software internationalization and localization, adapting software to the conventions of different languages for such common software tasks.
+
+See for further information:
+
+- [CLDR releases and downloads](https://cldr.unicode.org/index/downloads "CLDR Download Page"),
+including the data files and LDML specification associated with each release
+
+- [Repository organization](https://cldr.unicode.org/index/downloads#Repository_Organization "CLDR Download Page, Repository Organization"),
+describing the organization of files within this repository
+
+- [Building and running CLDR Tools](https://cldr.unicode.org/development/cldr-tools "CLDR Tools Page")
+
+### Contributing
+
+For details about all code or data contributions, see [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+#### Spotless
+
+A source formatter is now used, please see [spotless](./tools/README.md#spotless) for details.
+
+### Copyright & Licenses
+
+Copyright © 2004-2026 Unicode, Inc. Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the United States and other countries.
+
+A CLA is required to contribute to this project - please refer to the [CONTRIBUTING.md](./CONTRIBUTING.md) file (or start a Pull Request) for more information.
+
+The contents of this repository are governed by the Unicode [Terms of Use](https://www.unicode.org/copyright.html) and are released under [LICENSE](./LICENSE).
+
+Note that some CLDR tools depend on libraries managed via Maven; use of these libraries is governed by separate license agreements.
