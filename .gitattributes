@@ -1,0 +1,7 @@
+* text=auto eol=lf
+# Preserve the reviewed source snapshot and its byte-level manifests exactly.
+source-preview/** -text
+*.exe binary
+*.zip binary
+*.7z binary
+*.png binary
