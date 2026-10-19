@@ -1,16 +1,11 @@
-# Framework review subset
+# Lua framework
 
-These 18 modules are original framework/control adapters, exported under MIT with
-per-file source and export hashes in ORIGINS.json. They are not a standalone schema.
+Framework modules for input states, editing, candidate associations and presentation.
+Source revisions and hashes are recorded in `ORIGINS.json`.
 
-Dependencies deliberately not bundled include super_lookup, super_tips,
-super_filter, super_comment_preedit, super_english and wanxiang; inherited parts
-retain their own upstream attribution/license. Older business modules such as
-interaction, clock, snippets, calc, hot, unicode_mode, session, letters,
-slash_cmd and pinyin_shape also need separate review before a full scheme release.
-Native Component/Context APIs come from the pinned Rime/Lua source combination.
+This is a framework subset, not a standalone input schema. It depends on the
+matching Rime/Lua APIs and additional providers, including `super_lookup`,
+`super_tips`, `super_filter`, `super_comment_preedit`, `super_english`, `wanxiang`
+and the scheme's interaction, clock, snippets and other business modules.
 
-Do not add unknown dictionaries or copy personal modules to make this subset seem
-self-contained. Use ../examples/association_demo (from the package root) for the
-newly authored, dependency-free sample. Full schema dependency closure remains a
-follow-up publication task; nothing here claims a complete production scheme.
+For a standalone API example, see [association_demo](../examples/association_demo/).

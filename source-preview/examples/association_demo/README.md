@@ -47,7 +47,3 @@ the rod UI. If the Lua Interaction API is absent, `rods` automatically uses flat
 candidates instead. A modified core with an unmodified frontend should keep the
 explicit `flat` setting: API presence alone does not prove UI support.
 
-The example has no default rod arrow navigation, frontend capability spoofing,
-user learning, external programs, downloads or installation scripts. It is
-suitable for inspecting a synthetic structure without exposing personal input
-data. It does not claim cross-platform physical-device acceptance.
